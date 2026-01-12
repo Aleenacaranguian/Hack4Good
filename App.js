@@ -1,0 +1,57 @@
+import React, { useState } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { StatusBar } from 'expo-status-bar';
+
+// Screens
+import LoginScreen from './src/screens/LoginScreen';
+import CareRecipientHome from './src/screens/CareRecipientHome';
+import CaregiverHome from './src/screens/CaregiverHome';
+import CareRecipientDetail from './src/screens/CareRecipientDetail';
+import ShiftDetail from './src/screens/ShiftDetail';
+import RecordingDetail from './src/screens/RecordingDetail';
+
+const Stack = createNativeStackNavigator();
+
+export default function App() {
+  const [user, setUser] = useState(null);
+
+  return (
+    <NavigationContainer>
+      <StatusBar style="auto" />
+      <Stack.Navigator initialRouteName="Login">
+        <Stack.Screen
+          name="Login"
+          options={{ headerShown: false }}
+        >
+          {props => <LoginScreen {...props} setUser={setUser} />}
+        </Stack.Screen>
+        <Stack.Screen
+          name="CareRecipientHome"
+          component={CareRecipientHome}
+          options={{ title: 'Record Message', headerLeft: () => null }}
+        />
+        <Stack.Screen
+          name="CaregiverHome"
+          component={CaregiverHome}
+          options={{ title: 'Care Recipients', headerLeft: () => null }}
+        />
+        <Stack.Screen
+          name="CareRecipientDetail"
+          component={CareRecipientDetail}
+          options={{ title: 'Care Recipient Details' }}
+        />
+        <Stack.Screen
+          name="ShiftDetail"
+          component={ShiftDetail}
+          options={{ title: 'Shift Recordings' }}
+        />
+        <Stack.Screen
+          name="RecordingDetail"
+          component={RecordingDetail}
+          options={{ title: 'Recording & Notes' }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
