@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import {
+ import {
   View,
   Text,
   TextInput,
@@ -22,6 +22,7 @@ export default function LoginScreen({ navigation, setUser }) {
         navigation.replace('CareRecipientHome', { user });
       } else if (user.role === 'caregiver') {
         navigation.replace('CaregiverHome', { user });
+
       }
     } else {
       Alert.alert('Error', 'Invalid User ID');
@@ -85,7 +86,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255)', // Lighter overlay to see image better
+    backgroundColor: 'rgba(255, 255, 255, 0.5)', // Semi-transparent white overlay
   },
   container: {
     flex: 1,

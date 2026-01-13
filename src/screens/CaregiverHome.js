@@ -22,8 +22,18 @@ export default function CaregiverHome({ route, navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.welcomeText}>Welcome, {user.name}!</Text>
-        <Text style={styles.subtitle}>Your Care Recipients</Text>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.welcomeText}>Welcome, {user.name}!</Text>
+            <Text style={styles.subtitle}>Your Care Recipients</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <Text style={styles.logoutIcon}>👋</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.listContainer}>
@@ -71,6 +81,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   welcomeText: {
     fontSize: 24,
@@ -142,5 +157,21 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#999',
+  },
+  logoutButton: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: '#FFF3E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  logoutIcon: {
+    fontSize: 22,
   },
 });

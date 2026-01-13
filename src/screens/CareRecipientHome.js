@@ -262,12 +262,22 @@ export default function CareRecipientHome({ route, navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.welcomeText}>Welcome, {user.name}!</Text>
-        <Text style={styles.instructionText}>
-          {!hasRecording && !isRecording && 'Tap to record a voice message'}
-          {isRecording && 'Recording... Tap to stop'}
-          {hasRecording && 'Review your recording'}
-        </Text>
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.welcomeText}>Welcome, {user.name}!</Text>
+            <Text style={styles.instructionText}>
+              {!hasRecording && !isRecording && 'Tap to record a voice message'}
+              {isRecording && 'Recording... Tap to stop'}
+              {hasRecording && 'Review your recording'}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.logoutButton}
+            onPress={() => navigation.navigate('Login')}
+          >
+            <Text style={styles.logoutIcon}>👋</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -428,6 +438,11 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   welcomeText: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -437,6 +452,22 @@ const styles = StyleSheet.create({
   instructionText: {
     fontSize: 16,
     color: '#666',
+  },
+  logoutButton: {
+    width: 45,
+    height: 45,
+    borderRadius: 22.5,
+    backgroundColor: '#FFF3E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  logoutIcon: {
+    fontSize: 22,
   },
   scrollContent: {
     flexGrow: 1,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,13 +9,35 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
+import api from '../services/api';
 
 export default function RecordingDetail({ route }) {
   const { recording, shift, recipient, caregiver } = route.params;
   const [isPlaying, setIsPlaying] = useState(false);
   const [newNote, setNewNote] = useState('');
-  const [notes, setNotes] = useState(recording.notes);
+  const [notes, setNotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Fetch notes from API when component mounts
+  useEffect(() => {
+    fetchNotes();
+  }, []);
+
+  const fetchNotes = async () => {
+    try {
+      setLoading(true);
+      const fetchedNotes = await api.getNotes(recording.id);
+      setNotes(fetchedNotes);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to load notes. Please check if the backend server is running.');
+      console.error('Error fetching notes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const formatTime = (timestamp) => {
     const date = new Date(timestamp);
@@ -47,23 +69,30 @@ export default function RecordingDetail({ route }) {
     }
   };
 
-  const handleAddNote = () => {
+  const handleAddNote = async () => {
     if (newNote.trim() === '') {
       Alert.alert('Error', 'Please enter a note');
       return;
     }
 
-    const note = {
-      id: `N${Date.now()}`,
-      caregiverId: caregiver.id,
-      caregiverName: caregiver.name,
-      content: newNote.trim(),
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      setSubmitting(true);
+      const noteData = {
+        caregiverId: caregiver.id,
+        caregiverName: caregiver.name,
+        content: newNote.trim(),
+      };
 
-    setNotes([...notes, note]);
-    setNewNote('');
-    Alert.alert('Success', 'Note added successfully');
+      const createdNote = await api.addNote(recording.id, noteData);
+      setNotes([...notes, createdNote]);
+      setNewNote('');
+      Alert.alert('Success', 'Note added successfully and synced with server');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add note. Please check if the backend server is running.');
+      console.error('Error adding note:', error);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -120,22 +149,33 @@ export default function RecordingDetail({ route }) {
               onChangeText={setNewNote}
               multiline
               numberOfLines={3}
+              editable={!submitting}
             />
             <TouchableOpacity
-              style={styles.addNoteButton}
+              style={[styles.addNoteButton, submitting && styles.addNoteButtonDisabled]}
               onPress={handleAddNote}
+              disabled={submitting}
             >
-              <Text style={styles.addNoteButtonText}>Add Note</Text>
+              {submitting ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.addNoteButtonText}>Add Note</Text>
+              )}
             </TouchableOpacity>
           </View>
 
-          {notes.length > 0 ? (
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#4A90E2" />
+              <Text style={styles.loadingText}>Loading notes...</Text>
+            </View>
+          ) : notes.length > 0 ? (
             <View style={styles.notesList}>
               {notes.map((note) => (
                 <View key={note.id} style={styles.noteCard}>
                   <View style={styles.noteHeader}>
                     <Text style={styles.noteCaregiverName}>
-                      {note.caregiverName}
+                      {note.caregiverName || note.caregiver_name}
                     </Text>
                     <Text style={styles.noteTimestamp}>
                       {formatTime(note.timestamp)}
@@ -273,10 +313,26 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
+  addNoteButtonDisabled: {
+    backgroundColor: '#93B8E0',
+    opacity: 0.7,
+  },
   addNoteButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 40,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 15,
   },
   notesList: {
     marginTop: 10,
