@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   },
   recordingInfo: {
     fontSize: 16,
-    color: '#4A90E2',
+    color: 'red',
     marginBottom: 5,
   },
   timestamp: {
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#4A90E2',
+    backgroundColor: 'red',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   addNoteButton: {
-    backgroundColor: '#4A90E2',
+    backgroundColor: 'red',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
   noteCaregiverName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#4A90E2',
+    color: 'red',
   },
   noteTimestamp: {
     fontSize: 12,
