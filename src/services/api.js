@@ -4,7 +4,7 @@
 // For iOS Simulator: use localhost or 127.0.0.1
 // For Android Emulator: use 10.0.2.2
 // For Physical Device: use your computer's local IP (e.g., 192.168.1.x)
-const API_BASE_URL = 'http://10.179.74.128:5000';
+const API_BASE_URL = 'http://{your_hotspot}:5000';
 
 class ApiService {
   /**
@@ -86,6 +86,25 @@ class ApiService {
     return this.request(`/recordings/${recordingId}`);
   }
 
+  /**
+   * Create a new recording
+   */
+  async createRecording(recordingData) {
+    console.log('[API] createRecording called with:', recordingData);
+    console.log('[API] Sending POST to:', `${API_BASE_URL}/recordings`);
+    try {
+      const result = await this.request('/recordings', {
+        method: 'POST',
+        body: JSON.stringify(recordingData),
+      });
+      console.log('[API] createRecording success:', result);
+      return result;
+    } catch (error) {
+      console.error('[API] createRecording failed:', error);
+      throw error;
+    }
+  }
+
   // ============= SHIFTS API =============
 
   /**
@@ -94,6 +113,51 @@ class ApiService {
   async getShifts(careRecipientId = null) {
     const query = careRecipientId ? `?care_recipient_id=${careRecipientId}` : '';
     return this.request(`/shifts${query}`);
+  }
+
+  /**
+   * Get a specific shift
+   */
+  async getShift(shiftId) {
+    return this.request(`/shifts/${shiftId}`);
+  }
+
+  // ============= SHIFT NOTES API =============
+
+  /**
+   * Get all notes for a shift
+   */
+  async getShiftNotes(shiftId) {
+    return this.request(`/shifts/${shiftId}/notes`);
+  }
+
+  /**
+   * Add a new note to a shift
+   */
+  async addShiftNote(shiftId, noteData) {
+    return this.request(`/shifts/${shiftId}/notes`, {
+      method: 'POST',
+      body: JSON.stringify(noteData),
+    });
+  }
+
+  /**
+   * Update an existing shift note
+   */
+  async updateShiftNote(noteId, content) {
+    return this.request(`/shift-notes/${noteId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ content }),
+    });
+  }
+
+  /**
+   * Delete a shift note
+   */
+  async deleteShiftNote(noteId) {
+    return this.request(`/shift-notes/${noteId}`, {
+      method: 'DELETE',
+    });
   }
 
   // ============= USERS API =============

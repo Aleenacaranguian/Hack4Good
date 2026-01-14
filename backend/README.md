@@ -34,10 +34,17 @@ The API uses SQLite for local development. The database is automatically initial
 ### Recordings
 - `GET /recordings` - Get all recordings
 - `GET /recordings/<recording_id>` - Get a specific recording with notes
+- `POST /recordings` - Create a new recording
 
 ### Shifts
 - `GET /shifts` - Get all shifts
 - `GET /shifts?care_recipient_id=<id>` - Get shifts for a specific care recipient
+
+### Shift Notes
+- `GET /shifts/<shift_id>/notes` - Get all notes for a shift
+- `POST /shifts/<shift_id>/notes` - Add a new note to a shift
+- `PUT /shift-notes/<note_id>` - Update a shift note
+- `DELETE /shift-notes/<note_id>` - Delete a shift note
 
 ### Users
 - `GET /users` - Get all users
@@ -63,4 +70,27 @@ curl -X POST http://localhost:5000/recordings/R001/notes \
 ### Get notes for a recording:
 ```bash
 curl http://localhost:5000/recordings/R001/notes
+```
+
+### Add a shift note:
+```bash
+curl -X POST http://localhost:5000/shifts/S001/notes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "caregiverId": "CG001",
+    "caregiverName": "Alice Johnson",
+    "content": "Patient was in good spirits today. Participated in all activities."
+  }'
+```
+
+### Create a recording:
+```bash
+curl -X POST http://localhost:5000/recordings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "care_recipient_id": "CR001",
+    "shift_id": "S001",
+    "duration": 125,
+    "audio_url": "file:///path/to/recording.m4a"
+  }'
 ```

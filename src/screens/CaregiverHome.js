@@ -263,6 +263,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 12,
   },
   arrow: {
     fontSize: 24,

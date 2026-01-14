@@ -128,6 +128,20 @@ export default function CareRecipientDetail({ route, navigation }) {
     });
   };
 
+  const handleShiftPress = (shift, date) => {
+    navigation.navigate('ShiftDetail', {
+      shift: {
+        id: shift.id || `${recipient.id}-${date}-${shift.shiftNumber}`,
+        shift_number: shift.shiftNumber,
+        shiftNumber: shift.shiftNumber,
+        date: date,
+        day: shift.day || 1,
+      },
+      recipient,
+      caregiver,
+    });
+  };
+
   const handleViewProfile = () => {
     navigation.navigate('RecipientProfile', { recipient });
   };
@@ -186,7 +200,12 @@ export default function CareRecipientDetail({ route, navigation }) {
             {/* Shifts */}
             <View style={styles.shiftsContainer}>
               {day.shifts.map((shift, shiftIndex) => (
-                <View key={shiftIndex} style={styles.shiftBox}>
+                <TouchableOpacity
+                  key={shiftIndex}
+                  style={styles.shiftBox}
+                  onPress={() => handleShiftPress(shift, day.date)}
+                  activeOpacity={0.7}
+                >
                   <View style={styles.shiftHeader}>
                     <View style={styles.shiftBadge}>
                       <Text style={styles.shiftBadgeText}>Shift {shift.shiftNumber}</Text>
@@ -195,10 +214,13 @@ export default function CareRecipientDetail({ route, navigation }) {
                   </View>
                   <Text style={styles.shiftCaregiver}> {shift.caregiverName}</Text>
                   <View style={styles.notesBox}>
-                    <Text style={styles.notesLabel}>Notes:</Text>
+                    <Text style={styles.notesLabel}>Tap to view/add shift notes</Text>
                     <Text style={styles.notesText}>{shift.notes}</Text>
                   </View>
-                </View>
+                  <View style={styles.shiftArrowContainer}>
+                    <Text style={styles.shiftArrow}>›</Text>
+                  </View>
+                </TouchableOpacity>
               ))}
             </View>
 
@@ -361,6 +383,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: '#dee2e6',
+    position: 'relative',
   },
   shiftHeader: {
     flexDirection: 'row',
@@ -407,6 +430,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#212529',
     lineHeight: 20,
+  },
+  shiftArrowContainer: {
+    position: 'absolute',
+    right: 16,
+    top: '50%',
+    transform: [{ translateY: -12 }],
+  },
+  shiftArrow: {
+    fontSize: 28,
+    color: '#adb5bd',
+    fontWeight: 'bold',
   },
   recordingsContainer: {
     marginTop: 4,

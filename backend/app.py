@@ -80,6 +80,20 @@ def init_db():
         )
     ''')
 
+    # Shift notes table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS shift_notes (
+            id TEXT PRIMARY KEY,
+            shift_id TEXT NOT NULL,
+            caregiver_id TEXT NOT NULL,
+            caregiver_name TEXT NOT NULL,
+            content TEXT NOT NULL,
+            timestamp TEXT NOT NULL,
+            FOREIGN KEY (shift_id) REFERENCES shifts(id),
+            FOREIGN KEY (caregiver_id) REFERENCES users(id)
+        )
+    ''')
+
     conn.commit()
     conn.close()
     print("Database initialized successfully!")
@@ -245,6 +259,43 @@ def get_recordings():
     conn.close()
     return jsonify(recordings)
 
+@app.route('/recordings', methods=['POST'])
+def create_recording():
+    """Create a new recording"""
+    print("=== RECEIVED POST /recordings REQUEST ===")
+    data = request.json
+    print(f"Request data: {data}")
+
+    if not data.get('care_recipient_id') or not data.get('shift_id'):
+        print("ERROR: Missing required fields")
+        return jsonify({'error': 'care_recipient_id and shift_id are required'}), 400
+
+    recording_id = f"R{int(datetime.now().timestamp() * 1000)}"
+    timestamp = datetime.now().isoformat()
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO recordings (id, shift_id, care_recipient_id, timestamp, duration, audio_url)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (
+        recording_id,
+        data.get('shift_id'),
+        data.get('care_recipient_id'),
+        timestamp,
+        data.get('duration', 0),
+        data.get('audio_url')
+    ))
+    conn.commit()
+
+    # Return the created recording
+    cursor.execute('SELECT * FROM recordings WHERE id = ?', (recording_id,))
+    recording = dict(cursor.fetchone())
+    conn.close()
+
+    print(f"SUCCESS: Created recording {recording_id}")
+    return jsonify(recording), 201
+
 @app.route('/recordings/<recording_id>', methods=['GET'])
 def get_recording(recording_id):
     """Get a specific recording with its notes"""
@@ -261,6 +312,86 @@ def get_recording(recording_id):
 
     conn.close()
     return jsonify(recording)
+
+# ============= SHIFT NOTES ENDPOINTS =============
+
+@app.route('/shifts/<shift_id>/notes', methods=['GET'])
+def get_shift_notes(shift_id):
+    """Get all notes for a shift"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT * FROM shift_notes
+        WHERE shift_id = ?
+        ORDER BY timestamp DESC
+    ''', (shift_id,))
+    notes = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return jsonify(notes)
+
+@app.route('/shifts/<shift_id>/notes', methods=['POST'])
+def add_shift_note(shift_id):
+    """Add a new note to a shift"""
+    data = request.json
+
+    if not data.get('content'):
+        return jsonify({'error': 'Content is required'}), 400
+
+    note_id = f"SN{int(datetime.now().timestamp() * 1000)}"
+    timestamp = datetime.now().isoformat()
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO shift_notes (id, shift_id, caregiver_id, caregiver_name, content, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (
+        note_id,
+        shift_id,
+        data.get('caregiverId'),
+        data.get('caregiverName'),
+        data.get('content'),
+        timestamp
+    ))
+    conn.commit()
+
+    # Return the created note
+    cursor.execute('SELECT * FROM shift_notes WHERE id = ?', (note_id,))
+    note = dict(cursor.fetchone())
+    conn.close()
+
+    return jsonify(note), 201
+
+@app.route('/shift-notes/<note_id>', methods=['PUT'])
+def update_shift_note(note_id):
+    """Update an existing shift note"""
+    data = request.json
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        UPDATE shift_notes
+        SET content = ?
+        WHERE id = ?
+    ''', (data.get('content'), note_id))
+    conn.commit()
+
+    cursor.execute('SELECT * FROM shift_notes WHERE id = ?', (note_id,))
+    note = dict(cursor.fetchone())
+    conn.close()
+
+    return jsonify(note)
+
+@app.route('/shift-notes/<note_id>', methods=['DELETE'])
+def delete_shift_note(note_id):
+    """Delete a shift note"""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('DELETE FROM shift_notes WHERE id = ?', (note_id,))
+    conn.commit()
+    conn.close()
+
+    return jsonify({'message': 'Shift note deleted successfully'})
 
 # ============= SHIFTS ENDPOINTS =============
 

@@ -12,6 +12,7 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { Audio } from 'expo-av';
 import api from '../services/api';
 
 export default function RecordingDetail({ route }) {
@@ -21,10 +22,18 @@ export default function RecordingDetail({ route }) {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [sound, setSound] = useState(null);
 
   // Fetch notes from API when component mounts
   useEffect(() => {
     fetchNotes();
+
+    // Cleanup function to unload sound when component unmounts
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
   }, []);
 
   const fetchNotes = async () => {
@@ -57,16 +66,44 @@ export default function RecordingDetail({ route }) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handlePlayPause = () => {
-    // Simulate play/pause - actual audio playback would be implemented here
-    setIsPlaying(!isPlaying);
+  const handlePlayPause = async () => {
+    try {
+      if (!recording.audio_url) {
+        Alert.alert('Error', 'No audio file available for this recording');
+        return;
+      }
 
-    if (!isPlaying) {
-      // Simulate playback
-      Alert.alert('Playing', 'Audio playback would start here');
-      setTimeout(() => {
+      if (isPlaying && sound) {
+        // Pause the audio
+        await sound.pauseAsync();
         setIsPlaying(false);
-      }, 2000);
+      } else if (sound) {
+        // Resume playing
+        await sound.playAsync();
+        setIsPlaying(true);
+      } else {
+        // Load and play the audio for the first time
+        console.log('Loading audio from:', recording.audio_url);
+
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri: recording.audio_url },
+          { shouldPlay: true }
+        );
+
+        setSound(newSound);
+        setIsPlaying(true);
+
+        // Set up playback status update listener
+        newSound.setOnPlaybackStatusUpdate((status) => {
+          if (status.isLoaded && status.didJustFinish) {
+            setIsPlaying(false);
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      Alert.alert('Error', 'Failed to play audio. The recording may not be available.');
+      setIsPlaying(false);
     }
   };
 

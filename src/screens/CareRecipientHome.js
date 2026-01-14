@@ -8,8 +8,10 @@ import {
   Animated,
   Modal,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import api from '../services/api';
 
 export default function CareRecipientHome({ route, navigation }) {
   const { user } = route.params;
@@ -22,6 +24,7 @@ export default function CareRecipientHome({ route, navigation }) {
   const [sound, setSound] = useState(null);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [pulseAnim] = useState(new Animated.Value(1));
+  const [uploading, setUploading] = useState(false);
 
   // Mock caregiver list - replace with actual data from your backend
   const [caregivers] = useState([
@@ -192,25 +195,120 @@ export default function CareRecipientHome({ route, navigation }) {
     }
   };
 
-  const handleUpload = () => {
-    if (excludedCaregivers.length > 0) {
-      const excluded = caregivers
-        .filter(c => excludedCaregivers.includes(c.id))
-        .map(c => c.name)
-        .join(', ');
+  // OLD CODE - Mock upload without backend
+  // const handleUpload = () => {
+  //   if (excludedCaregivers.length > 0) {
+  //     const excluded = caregivers
+  //       .filter(c => excludedCaregivers.includes(c.id))
+  //       .map(c => c.name)
+  //       .join(', ');
+  //     Alert.alert(
+  //       'Upload Recording',
+  //       `Recording will be visible to all caregivers except: ${excluded}`,
+  //       [
+  //         { text: 'Cancel', style: 'cancel' },
+  //         {
+  //           text: 'Upload',
+  //           onPress: async () => {
+  //             Alert.alert('Success', 'Recording uploaded successfully!');
+  //             if (sound) {
+  //               await sound.unloadAsync();
+  //               setSound(null);
+  //             }
+  //             setHasRecording(false);
+  //             setRecordingUri(null);
+  //             setRecordingDuration(0);
+  //             setExcludedCaregivers([]);
+  //           }
+  //         },
+  //       ]
+  //     );
+  //   } else {
+  //     Alert.alert(
+  //       'Upload Recording',
+  //       'Recording will be visible to all caregivers',
+  //       [
+  //         { text: 'Cancel', style: 'cancel' },
+  //         {
+  //           text: 'Upload',
+  //           onPress: async () => {
+  //             Alert.alert('Success', 'Recording uploaded successfully!');
+  //             if (sound) {
+  //               await sound.unloadAsync();
+  //               setSound(null);
+  //             }
+  //             setHasRecording(false);
+  //             setRecordingUri(null);
+  //             setRecordingDuration(0);
+  //           }
+  //         },
+  //       ]
+  //     );
+  //   }
+  // };
 
-      Alert.alert(
-        'Upload Recording',
-        `Recording will be visible to all caregivers except: ${excluded}`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Upload',
-            onPress: async () => {
-              // Here you would upload to cloud storage with privacy settings
-              // Include excludedCaregivers array in the upload
+  // NEW CODE - Upload to backend
+  const handleUpload = async () => {
+    console.log('=== UPLOAD BUTTON PRESSED ===');
+    const confirmMessage = excludedCaregivers.length > 0
+      ? `Recording will be visible to all caregivers except: ${caregivers
+          .filter(c => excludedCaregivers.includes(c.id))
+          .map(c => c.name)
+          .join(', ')}`
+      : 'Recording will be visible to all caregivers';
+
+    Alert.alert(
+      'Upload Recording',
+      confirmMessage,
+      [
+        { text: 'Cancel', style: 'cancel', onPress: () => console.log('Upload cancelled') },
+        {
+          text: 'Upload',
+          onPress: async () => {
+            console.log('=== STARTING UPLOAD PROCESS ===');
+            try {
+              setUploading(true);
+              console.log('Upload state set to true');
+
+              // Get current date for shift assignment (using local timezone consistently)
+              const today = new Date();
+              const year = today.getFullYear();
+              const month = String(today.getMonth() + 1).padStart(2, '0');
+              const day = String(today.getDate()).padStart(2, '0');
+              const dateString = `${year}-${month}-${day}`;
+
+              // Determine shift number based on time (using local timezone)
+              const hour = today.getHours();
+              const shiftNumber = hour < 16 ? 1 : 2;
+
+              console.log('=== DATE CALCULATION DEBUG ===');
+              console.log('Local date/time:', today.toString());
+              console.log('Calculated dateString:', dateString);
+              console.log('Local hour:', hour);
+              console.log('Shift number:', shiftNumber);
+
+              // Find or create shift ID
+              const shiftId = `${user.id}-${dateString}-S${shiftNumber}`;
+
+              // Create recording data
+              const recordingData = {
+                care_recipient_id: user.id,
+                shift_id: shiftId,
+                duration: recordingDuration,
+                audio_url: recordingUri, // In production, upload to cloud storage first
+                excluded_caregivers: excludedCaregivers,
+              };
+
+              console.log('Recording data prepared:', JSON.stringify(recordingData, null, 2));
+
+              // Upload to backend
+              console.log('Calling api.createRecording...');
+              const response = await api.createRecording(recordingData);
+              console.log('API response received:', JSON.stringify(response, null, 2));
+
               Alert.alert('Success', 'Recording uploaded successfully!');
-              
+              console.log('Success alert shown');
+
               // Clean up
               if (sound) {
                 await sound.unloadAsync();
@@ -220,34 +318,16 @@ export default function CareRecipientHome({ route, navigation }) {
               setRecordingUri(null);
               setRecordingDuration(0);
               setExcludedCaregivers([]);
+            } catch (error) {
+              console.error('Upload error:', error);
+              Alert.alert('Error', 'Failed to upload recording. Please check if the backend server is running.');
+            } finally {
+              setUploading(false);
             }
           },
-        ]
-      );
-    } else {
-      Alert.alert(
-        'Upload Recording',
-        'Recording will be visible to all caregivers',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Upload',
-            onPress: async () => {
-              // Upload logic here
-              Alert.alert('Success', 'Recording uploaded successfully!');
-              
-              if (sound) {
-                await sound.unloadAsync();
-                setSound(null);
-              }
-              setHasRecording(false);
-              setRecordingUri(null);
-              setRecordingDuration(0);
-            }
-          },
-        ]
-      );
-    }
+        },
+      ]
+    );
   };
 
   const handleDelete = async () => {
@@ -380,10 +460,15 @@ export default function CareRecipientHome({ route, navigation }) {
             {/* Action Buttons */}
             <View style={styles.actionButtons}>
               <TouchableOpacity
-                style={[styles.actionButton, styles.uploadButton]}
+                style={[styles.actionButton, styles.uploadButton, uploading && styles.buttonDisabled]}
                 onPress={handleUpload}
+                disabled={uploading}
               >
-                <Text style={styles.actionButtonText}>📤 Upload</Text>
+                {uploading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.actionButtonText}>📤 Upload</Text>
+                )}
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -641,6 +726,9 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   privacyButton: {
     backgroundColor: 'white',
