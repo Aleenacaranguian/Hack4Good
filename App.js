@@ -10,6 +10,7 @@ import CaregiverHome from './src/screens/CaregiverHome';
 import CareRecipientDetail from './src/screens/CareRecipientDetail';
 import ShiftDetail from './src/screens/ShiftDetail';
 import RecordingDetail from './src/screens/RecordingDetail';
+import RecipientProfile from './src/screens/RecipientProfile'; // Add this import
 
 const Stack = createNativeStackNavigator();
 
@@ -40,6 +41,11 @@ export default function App() {
           name="CareRecipientDetail"
           component={CareRecipientDetail}
           options={{ title: 'Care Recipient Details' }}
+        />
+        <Stack.Screen
+          name="RecipientProfile"
+          component={RecipientProfile}
+          options={{ title: 'Care Profile' }}
         />
         <Stack.Screen
           name="ShiftDetail"
