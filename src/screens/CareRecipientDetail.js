@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,96 +6,103 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
+import api from '../services/api';
 
 export default function CareRecipientDetail({ route, navigation }) {
   const { recipient, caregiver } = route.params;
 
-  // Mock data for shifts and recordings
-  const [dailyData] = useState([
-    {
-      date: '2025-01-14',
-      displayDate: 'Today',
-      shifts: [
-        {
-          shiftNumber: 1,
-          caregiverName: 'Alice Chen',
-          time: '8:00 AM - 4:00 PM',
-          notes: 'Morning routine went well. Patient was in good spirits.',
-        },
-        {
-          shiftNumber: 2,
-          caregiverName: 'Bob Smith',
-          time: '4:00 PM - 12:00 AM',
-          notes: 'Evening medications administered. Patient requested extra blanket.',
-        },
-      ],
-      recordings: [
-        {
-          id: 'R001',
-          timestamp: '2025-01-14T10:30:00',
-          duration: 125,
-          uploadedBy: recipient.name,
-          notes: [],
-        },
-        {
-          id: 'R002',
-          timestamp: '2025-01-14T16:45:00',
-          duration: 98,
-          uploadedBy: recipient.name,
-          notes: [
-            {
-              id: 'N001',
-              caregiverId: 'CG001',
-              caregiverName: 'Alice Chen',
-              content: 'Patient mentioned feeling cold during this recording',
-              timestamp: '2025-01-14T11:00:00',
-            },
-          ],
-        },
-      ],
-    },
-    {
-      date: '2025-01-13',
-      displayDate: 'Yesterday',
-      shifts: [
-        {
-          shiftNumber: 1,
-          caregiverName: 'Sarah Johnson',
-          time: '8:00 AM - 4:00 PM',
-          notes: 'Patient had physical therapy session. Showed improvement in mobility.',
-        },
-      ],
-      recordings: [
-        {
-          id: 'R003',
-          timestamp: '2025-01-13T14:20:00',
-          duration: 87,
-          uploadedBy: recipient.name,
-          notes: [],
-        },
-      ],
-    },
-    {
-      date: '2025-01-12',
-      displayDate: 'Jan 12, 2025',
-      shifts: [
-        {
-          shiftNumber: 1,
-          caregiverName: 'Michael Chen',
-          time: '8:00 AM - 4:00 PM',
-          notes: 'Regular checkup completed. All vitals normal.',
-        },
-        {
-          shiftNumber: 2,
-          caregiverName: 'Emily Rodriguez',
-          time: '4:00 PM - 12:00 AM',
-          notes: 'Patient enjoyed evening activities. Ate full dinner.',
-        },
-      ],
-      recordings: [],
-    },
-  ]);
+  // State management
+  const [dailyData, setDailyData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Fetch shifts and recordings from backend
+  useEffect(() => {
+    fetchShiftsAndRecordings();
+  }, [recipient.id]);
+
+  const fetchShiftsAndRecordings = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Fetch shifts for this care recipient
+      const shifts = await api.getShifts(recipient.id);
+
+      // Group data by date
+      const groupedByDate = {};
+
+      for (const shift of shifts) {
+        const shiftDate = shift.date;
+
+        if (!groupedByDate[shiftDate]) {
+          groupedByDate[shiftDate] = {
+            date: shiftDate,
+            displayDate: formatDisplayDate(shiftDate),
+            shifts: [],
+            recordings: [],
+          };
+        }
+
+        // Add shift info (backend doesn't have detailed shift notes yet, so we'll show basic info)
+        groupedByDate[shiftDate].shifts.push({
+          shiftNumber: shift.shift_number,
+          caregiverName: 'Shift ' + shift.shift_number, // Backend doesn't have caregiver name in shift
+          time: 'Shift ' + shift.shift_number,
+          notes: `Shift ${shift.shift_number} - ${shiftDate}`,
+        });
+
+        // Add recordings for this shift and fetch their note counts
+        if (shift.recordings && shift.recordings.length > 0) {
+          for (const recording of shift.recordings) {
+            // Fetch notes for each recording to get the count
+            const notes = await api.getNotes(recording.id);
+
+            groupedByDate[shiftDate].recordings.push({
+              ...recording,
+              notes: notes, // Include the actual notes for count
+              uploadedBy: recipient.name,
+            });
+          }
+        }
+      }
+
+      // Convert to array and sort by date (most recent first)
+      const dailyDataArray = Object.values(groupedByDate).sort(
+        (a, b) => new Date(b.date) - new Date(a.date)
+      );
+
+      setDailyData(dailyDataArray);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Failed to load data. Please check if the backend server is running.');
+      Alert.alert('Error', 'Failed to load care recipient data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDisplayDate = (dateString) => {
+    const date = new Date(dateString);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    // Reset time parts for comparison
+    const dateOnly = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const yesterdayOnly = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+
+    if (dateOnly.getTime() === todayOnly.getTime()) {
+      return 'Today';
+    } else if (dateOnly.getTime() === yesterdayOnly.getTime()) {
+      return 'Yesterday';
+    } else {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+  };
 
   const formatTime = (timestamp) => {
     const date = new Date(timestamp);
@@ -144,11 +151,31 @@ export default function CareRecipientDetail({ route, navigation }) {
       </View>
 
       {/* Daily Data */}
-      <ScrollView 
+      <ScrollView
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
-        {dailyData.map((day, dayIndex) => (
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="red" />
+            <Text style={styles.loadingText}>Loading care recipient data...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={fetchShiftsAndRecordings}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : dailyData.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No data available for this care recipient</Text>
+          </View>
+        ) : (
+          dailyData.map((day, dayIndex) => (
           <View key={day.date} style={styles.dayBox}>
             {/* Day Header */}
             <View style={styles.dayHeader}>
@@ -218,7 +245,8 @@ export default function CareRecipientDetail({ route, navigation }) {
               </View>
             )}
           </View>
-        ))}
+          ))
+        )}
       </ScrollView>
     </View>
   );
@@ -480,6 +508,61 @@ const styles = StyleSheet.create({
   noRecordingsText: {
     fontSize: 14,
     color: '#adb5bd',
+    fontStyle: 'italic',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6c757d',
+    marginTop: 16,
+    fontWeight: '500',
+  },
+  errorContainer: {
+    backgroundColor: '#fee',
+    borderRadius: 12,
+    padding: 24,
+    margin: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#fcc',
+  },
+  errorText: {
+    fontSize: 15,
+    color: '#c00',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 22,
+  },
+  retryButton: {
+    backgroundColor: 'red',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 40,
+    margin: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    borderStyle: 'dashed',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#adb5bd',
+    textAlign: 'center',
     fontStyle: 'italic',
   },
 });
