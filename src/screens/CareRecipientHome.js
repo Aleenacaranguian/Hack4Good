@@ -22,7 +22,7 @@ export default function CareRecipientHome({ route, navigation }) {
   const [sound, setSound] = useState(null);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [pulseAnim] = useState(new Animated.Value(1));
-  
+
   // Mock caregiver list - replace with actual data from your backend
   const [caregivers] = useState([
     { id: 'CG001', name: 'Sarah Johnson' },
@@ -30,8 +30,51 @@ export default function CareRecipientHome({ route, navigation }) {
     { id: 'CG003', name: 'Emily Rodriguez' },
     { id: 'CG004', name: 'David Kim' },
   ]);
-  
   const [excludedCaregivers, setExcludedCaregivers] = useState([]);
+
+  const handleLogout = async () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            // Clean up any active recordings or playback
+            if (sound) {
+              await sound.unloadAsync();
+              setSound(null);
+            }
+            if (recording) {
+              await recording.stopAndUnloadAsync();
+              setRecording(null);
+            }
+            
+            // Clear any intervals
+            if (recording?._interval) {
+              clearInterval(recording._interval);
+            }
+            
+            // Here you would also clear any authentication tokens, user session, etc.
+            // For example:
+            // await AsyncStorage.removeItem('userToken');
+            // await AsyncStorage.removeItem('userData');
+            
+            // Navigate back to login screen
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Login' }], // Replace 'Login' with your actual login screen name
+            });
+          },
+        },
+      ]
+    );
+  };
 
   const startPulse = () => {
     Animated.loop(
@@ -58,7 +101,6 @@ export default function CareRecipientHome({ route, navigation }) {
   const startRecording = async () => {
     try {
       const permission = await Audio.requestPermissionsAsync();
-
       if (permission.status === 'granted') {
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
@@ -80,7 +122,6 @@ export default function CareRecipientHome({ route, navigation }) {
           setRecordingDuration(prev => prev + 1);
         }, 1000);
         recording._interval = interval;
-
       } else {
         Alert.alert('Permission Denied', 'Microphone permission is required to record audio.');
       }
@@ -96,7 +137,7 @@ export default function CareRecipientHome({ route, navigation }) {
     try {
       setIsRecording(false);
       stopPulse();
-      
+
       // Clear interval
       if (recording._interval) {
         clearInterval(recording._interval);
@@ -157,13 +198,14 @@ export default function CareRecipientHome({ route, navigation }) {
         .filter(c => excludedCaregivers.includes(c.id))
         .map(c => c.name)
         .join(', ');
+
       Alert.alert(
         'Upload Recording',
         `Recording will be visible to all caregivers except: ${excluded}`,
         [
           { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Upload', 
+          {
+            text: 'Upload',
             onPress: async () => {
               // Here you would upload to cloud storage with privacy settings
               // Include excludedCaregivers array in the upload
@@ -188,8 +230,8 @@ export default function CareRecipientHome({ route, navigation }) {
         'Recording will be visible to all caregivers',
         [
           { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Upload', 
+          {
+            text: 'Upload',
             onPress: async () => {
               // Upload logic here
               Alert.alert('Success', 'Recording uploaded successfully!');
@@ -214,8 +256,8 @@ export default function CareRecipientHome({ route, navigation }) {
       'Are you sure you want to delete this recording?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Delete', 
+        {
+          text: 'Delete',
           style: 'destructive',
           onPress: async () => {
             if (sound) {
@@ -261,22 +303,35 @@ export default function CareRecipientHome({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.welcomeText}>Welcome, {user.name}!</Text>
-        <Text style={styles.instructionText}>
-          {!hasRecording && !isRecording && 'Tap to record a voice message'}
-          {isRecording && 'Recording... Tap to stop'}
-          {hasRecording && 'Review your recording'}
-        </Text>
-      </View>
-
       <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.WelcomeText}>Welcome back,</Text>
+              <Text style={styles.nameText}>{user.name}</Text>
+              {!hasRecording && !isRecording && (
+                <Text style={styles.instructionText}>Tap to record a voice message</Text>
+              )}
+              {isRecording && (
+                <Text style={styles.instructionText}>Recording... Tap to stop</Text>
+              )}
+              {hasRecording && (
+                <Text style={styles.instructionText}>Review your recording</Text>
+              )}
+            </View>
+            <TouchableOpacity 
+              style={styles.logoutButton}
+              onPress={handleLogout}
+            >
+              <Text style={styles.logoutButtonText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Recording Duration Display */}
         {(isRecording || hasRecording) && (
           <View style={styles.durationContainer}>
-            <Text style={styles.durationText}>
-              {formatDuration(recordingDuration)}
-            </Text>
+            <Text style={styles.durationText}>{formatDuration(recordingDuration)}</Text>
           </View>
         )}
 
@@ -286,7 +341,6 @@ export default function CareRecipientHome({ route, navigation }) {
             <TouchableOpacity
               style={styles.recordButton}
               onPress={handleRecordButton}
-              activeOpacity={0.7}
             >
               <Animated.View
                 style={[
@@ -295,10 +349,12 @@ export default function CareRecipientHome({ route, navigation }) {
                   { transform: [{ scale: isRecording ? pulseAnim : 1 }] },
                 ]}
               >
-                <View style={[
-                  styles.recordIcon,
-                  isRecording && styles.recordIconStop
-                ]} />
+                <View
+                  style={[
+                    styles.recordIcon,
+                    isRecording && styles.recordIconStop,
+                  ]}
+                />
               </Animated.View>
             </TouchableOpacity>
           </View>
@@ -311,7 +367,6 @@ export default function CareRecipientHome({ route, navigation }) {
               <TouchableOpacity
                 style={styles.playButton}
                 onPress={handlePlayback}
-                activeOpacity={0.7}
               >
                 <Text style={styles.playButtonText}>
                   {isPlaying ? '⏸' : '▶'}
@@ -344,22 +399,20 @@ export default function CareRecipientHome({ route, navigation }) {
               >
                 <Text style={styles.deleteButtonText}>🗑️ Delete</Text>
               </TouchableOpacity>
-            </View>
 
-            {/* Privacy Settings */}
-            <TouchableOpacity
-              style={styles.privacyButton}
-              onPress={() => setShowPrivacyModal(true)}
-            >
-              <Text style={styles.privacyButtonText}>
-                🔒 Privacy Settings
-              </Text>
-              <Text style={styles.privacySubtext}>
-                {excludedCaregivers.length === 0
-                  ? 'Visible to all caregivers'
-                  : `Hidden from ${excludedCaregivers.length} caregiver(s)`}
-              </Text>
-            </TouchableOpacity>
+              {/* Privacy Settings */}
+              <TouchableOpacity
+                style={styles.privacyButton}
+                onPress={() => setShowPrivacyModal(true)}
+              >
+                <Text style={styles.privacyButtonText}>🔒 Privacy Settings</Text>
+                <Text style={styles.privacySubtext}>
+                  {excludedCaregivers.length === 0
+                    ? 'Visible to all caregivers'
+                    : `Hidden from ${excludedCaregivers.length} caregiver(s)`}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -386,17 +439,24 @@ export default function CareRecipientHome({ route, navigation }) {
                     key={caregiver.id}
                     style={[
                       styles.caregiverItem,
-                      isExcluded && styles.caregiverItemExcluded
+                      isExcluded && styles.caregiverItemExcluded,
                     ]}
                     onPress={() => toggleCaregiverExclusion(caregiver.id)}
                   >
-                    <Text style={[
-                      styles.caregiverName,
-                      isExcluded && styles.caregiverNameExcluded
-                    ]}>
+                    <Text
+                      style={[
+                        styles.caregiverName,
+                        isExcluded && styles.caregiverNameExcluded,
+                      ]}
+                    >
                       {caregiver.name}
                     </Text>
-                    <Text style={styles.caregiverStatus}>
+                    <Text
+                      style={[
+                        styles.caregiverStatus,
+                        { color: isExcluded ? '#f44336' : '#4CAF50' },
+                      ]}
+                    >
                       {isExcluded ? '❌ Hidden' : '✅ Visible'}
                     </Text>
                   </TouchableOpacity>
@@ -428,15 +488,45 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
-  welcomeText: {
-    fontSize: 24,
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerTextContainer: {
+    flex: 1,
+  },
+  WelcomeText: {
+    fontSize: 20,
+    color: '#666',
+    marginBottom: 4,
+  },
+  nameText: {
+    fontSize: 28,
     fontWeight: 'bold',
-    color: 'red',
+    color: '#1a1a1a',
     marginBottom: 8,
   },
   instructionText: {
     fontSize: 16,
     color: '#666',
+  },
+  logoutButton: {
+    backgroundColor: '#f44336',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginLeft: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  logoutButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   scrollContent: {
     flexGrow: 1,
@@ -466,7 +556,7 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     borderRadius: 70,
-    backgroundColor: '#4CAF50', // Green when ready
+    backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -476,7 +566,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   recordingActive: {
-    backgroundColor: '#f44336', // Red when recording
+    backgroundColor: '#f44336',
   },
   recordIcon: {
     width: 60,
@@ -485,7 +575,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
   recordIconStop: {
-    borderRadius: 8, // Square when recording
+    borderRadius: 8,
   },
   playbackSection: {
     padding: 20,

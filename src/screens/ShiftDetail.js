@@ -1,3 +1,4 @@
+//shift details 
 import React from 'react';
 import {
   View,
