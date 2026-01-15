@@ -9,6 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { careRecipients } from '../data/mockData';
+import { Colors, TextStyles, ContainerStyles, Shadows, BorderRadius } from '../styles/CommonStyles';
 
 export default function CaregiverHome({ route, navigation }) {
   const { user } = route.params;
@@ -124,20 +125,10 @@ export default function CaregiverHome({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
+    ...ContainerStyles.screen,
   },
   header: {
-    backgroundColor: 'white',
-    paddingTop: 20,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    ...ContainerStyles.headerRounded,
   },
   headerContent: {
     paddingHorizontal: 20,
@@ -150,34 +141,31 @@ const styles = StyleSheet.create({
   },
   welcomeText: {
     fontSize: 20,
-    color: '#666',
+    color: Colors.textLight,
     marginBottom: 4,
   },
   nameText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    ...TextStyles.h2,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: 'red',
+    color: Colors.primary,
     fontWeight: '600',
   },
   logoutButton: {
-    backgroundColor: '#fee',
+    backgroundColor: Colors.primaryLight,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 12,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#fcc',
     marginLeft: 12,
   },
-
   logoutText: {
-    color: '#f44336',
+    color: Colors.danger,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -186,14 +174,10 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   card: {
-    backgroundColor: 'white',
-    borderRadius: 16,
+    backgroundColor: Colors.white,
+    borderRadius: BorderRadius.lg,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    ...Shadows.small,
     borderWidth: 1,
     borderColor: '#f0f0f0',
   },
@@ -209,7 +193,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: 'red',
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#4A90E2',
@@ -219,7 +203,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   avatarText: {
-    color: 'white',
+    color: Colors.white,
     fontSize: 24,
     fontWeight: 'bold',
   },
@@ -227,9 +211,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   recipientName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    ...TextStyles.h4,
     marginBottom: 8,
   },
   detailsRow: {
@@ -239,12 +221,12 @@ const styles = StyleSheet.create({
   detailBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: Colors.gray50,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: BorderRadius.sm,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: Colors.gray200,
   },
   detailIcon: {
     fontSize: 14,
@@ -252,7 +234,7 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 13,
-    color: '#495057',
+    color: Colors.gray700,
     fontWeight: '500',
   },
   arrowContainer: {
@@ -260,14 +242,14 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: Colors.gray50,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
   },
   arrow: {
     fontSize: 24,
-    color: 'red',
+    color: Colors.primary,
     fontWeight: 'bold',
   },
   emptyState: {
@@ -285,13 +267,13 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#495057',
+    color: Colors.gray700,
     marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#adb5bd',
+    color: Colors.gray500,
     textAlign: 'center',
   },
 });

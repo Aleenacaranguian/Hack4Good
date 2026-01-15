@@ -8,6 +8,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
+import { Colors, TextStyles, ContainerStyles, Shadows, BorderRadius } from '../styles/CommonStyles';
 
 export default function RecipientProfile({ route, navigation }) {
   const { recipient } = route.params;
@@ -298,20 +299,11 @@ export default function RecipientProfile({ route, navigation }) {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
+    ...ContainerStyles.screen,
+    backgroundColor: Colors.gray50,
   },
   header: {
-    backgroundColor: 'white',
-    paddingTop: 20,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    ...ContainerStyles.headerRounded,
   },
   headerTop: {
     paddingHorizontal: 20,
@@ -324,7 +316,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'red',
+    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 12,
@@ -335,20 +327,17 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   avatarText: {
-    color: 'white',
+    color: Colors.white,
     fontSize: 32,
     fontWeight: 'bold',
   },
   profileName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    ...TextStyles.h2,
     marginBottom: 4,
   },
   profileSubtitle: {
-    fontSize: 16,
-    color: '#6c757d',
-    fontWeight: '500',
+    ...TextStyles.body,
+    color: Colors.gray600,
   },
   scrollContainer: {
     flex: 1,
@@ -356,14 +345,7 @@ const styles = StyleSheet.create({
   section: {
     margin: 20,
     marginBottom: 0,
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    ...ContainerStyles.card,
     borderWidth: 1,
     borderColor: '#f0f0f0',
   },
@@ -373,7 +355,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingBottom: 12,
     borderBottomWidth: 2,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: Colors.gray200,
   },
   sectionIcon: {
     fontSize: 24,
@@ -382,15 +364,15 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: Colors.text,
   },
   sectionContent: {
     gap: 8,
   },
   subsectionTitle: {
-    fontSize: 16,
+    ...TextStyles.body,
     fontWeight: 'bold',
-    color: '#495057',
+    color: Colors.gray700,
     marginTop: 16,
     marginBottom: 8,
   },
@@ -398,17 +380,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f8f9fa',
+    borderBottomColor: Colors.gray50,
   },
   infoLabel: {
     fontSize: 15,
-    color: '#6c757d',
+    color: Colors.gray600,
     fontWeight: '600',
     width: 140,
   },
   infoValue: {
     fontSize: 15,
-    color: '#1a1a1a',
+    color: Colors.text,
     flex: 1,
   },
   listItem: {
@@ -421,34 +403,33 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#4A90E2',
+    backgroundColor: Colors.info,
     marginTop: 7,
     marginRight: 10,
   },
   bulletWarning: {
-    backgroundColor: '#f44336',
+    backgroundColor: Colors.danger,
   },
   listText: {
     fontSize: 15,
-    color: '#495057',
+    color: Colors.gray700,
     flex: 1,
     lineHeight: 22,
   },
   listTextWarning: {
-    color: '#f44336',
+    color: Colors.danger,
     fontWeight: '600',
   },
   emergencyCard: {
     backgroundColor: '#fff5f5',
-    borderRadius: 12,
+    borderRadius: BorderRadius.md,
     padding: 16,
     marginTop: 16,
     borderWidth: 2,
     borderColor: '#ffcccc',
   },
   emergencyTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    ...TextStyles.h4,
     color: '#d32f2f',
     marginBottom: 12,
   },
