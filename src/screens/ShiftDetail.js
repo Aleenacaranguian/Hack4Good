@@ -13,6 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import api from '../services/api';
+import ShiftAIAnalysis from '../components/ShiftAIAnalysis';
 import { Colors, TextStyles, ButtonStyles, ContainerStyles, InputStyles, Shadows, BorderRadius } from '../styles/CommonStyles';
 
 export default function ShiftDetail({ route, navigation }) {
@@ -225,6 +226,14 @@ export default function ShiftDetail({ route, navigation }) {
               <Text style={styles.emptyNotesText}>No shift notes yet</Text>
             </View>
           )}
+        </View>
+
+        {/* AI Analysis Section */}
+        <View style={styles.aiAnalysisSection}>
+          <ShiftAIAnalysis
+            shiftId={shift.id}
+            careRecipientName={recipient.name}
+          />
         </View>
 
         {/* Recordings Section */}
@@ -465,5 +474,10 @@ const styles = StyleSheet.create({
   emptyNotesText: {
     ...TextStyles.small,
     textAlign: 'center',
+  },
+  aiAnalysisSection: {
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    backgroundColor: '#f5f5f5',
   },
 });

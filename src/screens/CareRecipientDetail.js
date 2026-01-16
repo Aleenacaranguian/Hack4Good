@@ -108,12 +108,12 @@ export default function CareRecipientDetail({ route, navigation }) {
 
         // Add shift info with mock caregiver data
         groupedByDate[shiftDate].shifts.push({
-          shiftNumber: shiftNumberForDay, // Use day-specific shift number
-          caregiverName: mockCaregivers[shiftIndex],
-          startTime: shiftTimes[timeIndex].start,
-          endTime: shiftTimes[timeIndex].end,
-          time: `${shiftTimes[timeIndex].start} - ${shiftTimes[timeIndex].end}`,
-          notes: mockShiftActivities[activityIndex],
+          id: shift.id, // Include the shift ID from backend
+          shiftNumber: shift.shift_number,
+          caregiverName: 'Shift ' + shift.shift_number, // Backend doesn't have caregiver name in shift
+          time: 'Shift ' + shift.shift_number,
+          notes: `Shift ${shift.shift_number} - ${shiftDate}`,
+          day: shift.day,
         });
 
         // Add recordings for this shift and fetch their note counts

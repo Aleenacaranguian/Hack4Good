@@ -4,7 +4,7 @@
 // For iOS Simulator: use localhost or 127.0.0.1
 // For Android Emulator: use 10.0.2.2
 // For Physical Device: use your computer's local IP (e.g., 192.168.1.x)
-const API_BASE_URL = 'http://172.20.10.4:5000';
+const API_BASE_URL = 'http:///{change me!}:5000';
 
 class ApiService {
   /**
@@ -158,6 +158,24 @@ class ApiService {
     return this.request(`/shift-notes/${noteId}`, {
       method: 'DELETE',
     });
+  }
+
+  // ============= AI/GEMINI API =============
+
+  /**
+   * Analyze shift notes and get AI-powered suggestions for next shift
+   */
+  async analyzeShiftNotes(shiftId) {
+    return this.request(`/shifts/${shiftId}/analyze`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * Get AI-generated summary of shift notes
+   */
+  async getShiftSummary(shiftId) {
+    return this.request(`/shifts/${shiftId}/summary`);
   }
 
   // ============= USERS API =============
