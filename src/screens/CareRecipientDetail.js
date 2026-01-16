@@ -358,7 +358,7 @@ export default function CareRecipientDetail({ route, navigation }) {
     try {
       // Use the first shift of the day for analysis
       const shiftId = day.shifts[0].id;
-      const analysis = await api.analyzeShift(shiftId);
+      const analysis = await api.analyzeShiftNotes(shiftId);
       setAiAnalysisData(analysis);
     } catch (error) {
       console.error('Error analyzing shift:', error);
