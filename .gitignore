@@ -69,4 +69,6 @@ web-build/
 .claude/
 tmpclaude-*
 
-elderly_db
+backend/check_db.py
+backend/clear_shifts.py
+backend/migrate_recordings.py
