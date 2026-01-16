@@ -4,7 +4,7 @@
 // For iOS Simulator: use localhost or 127.0.0.1
 // For Android Emulator: use 10.0.2.2
 // For Physical Device: use your computer's local IP (e.g., 192.168.1.x)
-const API_BASE_URL = 'http://{your_hotspot}:5000';
+const API_BASE_URL = 'http://172.20.10.4:5000';
 
 class ApiService {
   /**

@@ -68,3 +68,5 @@ web-build/
 # Claude Code
 .claude/
 tmpclaude-*
+
+elderly_db
