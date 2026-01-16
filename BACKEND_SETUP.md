@@ -53,7 +53,7 @@ To find your local IP address:
 
 Once both the backend and frontend are running:
 
-1. Open the app in your simulator/device
+1. Open the app in r  simulator/device
 2. Navigate to a recording detail page
 3. Try adding a note
 4. The note should be saved to the database and visible to all users

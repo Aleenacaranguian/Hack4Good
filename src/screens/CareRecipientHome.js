@@ -8,10 +8,9 @@ import {
   Animated,
   Modal,
   ScrollView,
-  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Audio } from 'expo-av';
-import api from '../services/api';
 
 export default function CareRecipientHome({ route, navigation }) {
   const { user } = route.params;
@@ -24,7 +23,6 @@ export default function CareRecipientHome({ route, navigation }) {
   const [sound, setSound] = useState(null);
   const [showPrivacyModal, setShowPrivacyModal] = useState(false);
   const [pulseAnim] = useState(new Animated.Value(1));
-  const [uploading, setUploading] = useState(false);
 
   // Mock caregiver list - replace with actual data from your backend
   const [caregivers] = useState([
@@ -195,120 +193,25 @@ export default function CareRecipientHome({ route, navigation }) {
     }
   };
 
-  // OLD CODE - Mock upload without backend
-  // const handleUpload = () => {
-  //   if (excludedCaregivers.length > 0) {
-  //     const excluded = caregivers
-  //       .filter(c => excludedCaregivers.includes(c.id))
-  //       .map(c => c.name)
-  //       .join(', ');
-  //     Alert.alert(
-  //       'Upload Recording',
-  //       `Recording will be visible to all caregivers except: ${excluded}`,
-  //       [
-  //         { text: 'Cancel', style: 'cancel' },
-  //         {
-  //           text: 'Upload',
-  //           onPress: async () => {
-  //             Alert.alert('Success', 'Recording uploaded successfully!');
-  //             if (sound) {
-  //               await sound.unloadAsync();
-  //               setSound(null);
-  //             }
-  //             setHasRecording(false);
-  //             setRecordingUri(null);
-  //             setRecordingDuration(0);
-  //             setExcludedCaregivers([]);
-  //           }
-  //         },
-  //       ]
-  //     );
-  //   } else {
-  //     Alert.alert(
-  //       'Upload Recording',
-  //       'Recording will be visible to all caregivers',
-  //       [
-  //         { text: 'Cancel', style: 'cancel' },
-  //         {
-  //           text: 'Upload',
-  //           onPress: async () => {
-  //             Alert.alert('Success', 'Recording uploaded successfully!');
-  //             if (sound) {
-  //               await sound.unloadAsync();
-  //               setSound(null);
-  //             }
-  //             setHasRecording(false);
-  //             setRecordingUri(null);
-  //             setRecordingDuration(0);
-  //           }
-  //         },
-  //       ]
-  //     );
-  //   }
-  // };
+  const handleUpload = () => {
+    if (excludedCaregivers.length > 0) {
+      const excluded = caregivers
+        .filter(c => excludedCaregivers.includes(c.id))
+        .map(c => c.name)
+        .join(', ');
 
-  // NEW CODE - Upload to backend
-  const handleUpload = async () => {
-    console.log('=== UPLOAD BUTTON PRESSED ===');
-    const confirmMessage = excludedCaregivers.length > 0
-      ? `Recording will be visible to all caregivers except: ${caregivers
-          .filter(c => excludedCaregivers.includes(c.id))
-          .map(c => c.name)
-          .join(', ')}`
-      : 'Recording will be visible to all caregivers';
-
-    Alert.alert(
-      'Upload Recording',
-      confirmMessage,
-      [
-        { text: 'Cancel', style: 'cancel', onPress: () => console.log('Upload cancelled') },
-        {
-          text: 'Upload',
-          onPress: async () => {
-            console.log('=== STARTING UPLOAD PROCESS ===');
-            try {
-              setUploading(true);
-              console.log('Upload state set to true');
-
-              // Get current date for shift assignment (using local timezone consistently)
-              const today = new Date();
-              const year = today.getFullYear();
-              const month = String(today.getMonth() + 1).padStart(2, '0');
-              const day = String(today.getDate()).padStart(2, '0');
-              const dateString = `${year}-${month}-${day}`;
-
-              // Determine shift number based on time (using local timezone)
-              const hour = today.getHours();
-              const shiftNumber = hour < 16 ? 1 : 2;
-
-              console.log('=== DATE CALCULATION DEBUG ===');
-              console.log('Local date/time:', today.toString());
-              console.log('Calculated dateString:', dateString);
-              console.log('Local hour:', hour);
-              console.log('Shift number:', shiftNumber);
-
-              // Find or create shift ID
-              const shiftId = `${user.id}-${dateString}-S${shiftNumber}`;
-
-              // Create recording data
-              const recordingData = {
-                care_recipient_id: user.id,
-                shift_id: shiftId,
-                duration: recordingDuration,
-                audio_url: recordingUri, // In production, upload to cloud storage first
-                excluded_caregivers: excludedCaregivers,
-              };
-
-              console.log('Recording data prepared:', JSON.stringify(recordingData, null, 2));
-
-              // Upload to backend
-              console.log('Calling api.createRecording...');
-              const response = await api.createRecording(recordingData);
-              console.log('API response received:', JSON.stringify(response, null, 2));
-
+      Alert.alert(
+        'Upload Recording',
+        `Recording will be visible to all caregivers except: ${excluded}`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Upload',
+            onPress: async () => {
+              // Here you would upload to cloud storage with privacy settings
+              // Include excludedCaregivers array in the upload
               Alert.alert('Success', 'Recording uploaded successfully!');
-              console.log('Success alert shown');
-
+              
               // Clean up
               if (sound) {
                 await sound.unloadAsync();
@@ -318,16 +221,34 @@ export default function CareRecipientHome({ route, navigation }) {
               setRecordingUri(null);
               setRecordingDuration(0);
               setExcludedCaregivers([]);
-            } catch (error) {
-              console.error('Upload error:', error);
-              Alert.alert('Error', 'Failed to upload recording. Please check if the backend server is running.');
-            } finally {
-              setUploading(false);
             }
           },
-        },
-      ]
-    );
+        ]
+      );
+    } else {
+      Alert.alert(
+        'Upload Recording',
+        'Recording will be visible to all caregivers',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Upload',
+            onPress: async () => {
+              // Upload logic here
+              Alert.alert('Success', 'Recording uploaded successfully!');
+              
+              if (sound) {
+                await sound.unloadAsync();
+                setSound(null);
+              }
+              setHasRecording(false);
+              setRecordingUri(null);
+              setRecordingDuration(0);
+            }
+          },
+        ]
+      );
+    }
   };
 
   const handleDelete = async () => {
@@ -389,17 +310,8 @@ export default function CareRecipientHome({ route, navigation }) {
             <View style={styles.headerTextContainer}>
               <Text style={styles.WelcomeText}>Welcome back,</Text>
               <Text style={styles.nameText}>{user.name}</Text>
-              {!hasRecording && !isRecording && (
-                <Text style={styles.instructionText}>Tap to record a voice message</Text>
-              )}
-              {isRecording && (
-                <Text style={styles.instructionText}>Recording... Tap to stop</Text>
-              )}
-              {hasRecording && (
-                <Text style={styles.instructionText}>Review your recording</Text>
-              )}
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.logoutButton}
               onPress={handleLogout}
             >
@@ -408,16 +320,14 @@ export default function CareRecipientHome({ route, navigation }) {
           </View>
         </View>
 
-        {/* Recording Duration Display */}
-        {(isRecording || hasRecording) && (
-          <View style={styles.durationContainer}>
-            <Text style={styles.durationText}>{formatDuration(recordingDuration)}</Text>
-          </View>
-        )}
-
         {/* Main Record/Stop Button */}
         {!hasRecording && (
           <View style={styles.recordingContainer}>
+            <View style={styles.durationPlaceholder}>
+              {isRecording && (
+                <Text style={styles.durationTextAbove}>{formatDuration(recordingDuration)}</Text>
+              )}
+            </View>
             <TouchableOpacity
               style={styles.recordButton}
               onPress={handleRecordButton}
@@ -429,14 +339,36 @@ export default function CareRecipientHome({ route, navigation }) {
                   { transform: [{ scale: isRecording ? pulseAnim : 1 }] },
                 ]}
               >
-                <View
-                  style={[
-                    styles.recordIcon,
-                    isRecording && styles.recordIconStop,
-                  ]}
-                />
+                {!isRecording && (
+                  <Image
+                    source={require('../../assets/mic.png')}
+                    style={styles.micImage}
+                    resizeMode="contain"
+                  />
+                )}
+                {isRecording && (
+                  <View
+                    style={[
+                      styles.recordIcon,
+                      styles.recordIconStop,
+                    ]}
+                  />
+                )}
               </Animated.View>
             </TouchableOpacity>
+            {!isRecording && (
+              <Text style={styles.instructionText}>Tap to record a voice message</Text>
+            )}
+            {isRecording && (
+              <Text style={styles.instructionText}>Recording... Tap to stop</Text>
+            )}
+          </View>
+        )}
+
+        {/* Review instruction for playback */}
+        {hasRecording && (
+          <View style={styles.reviewInstructionContainer}>
+            <Text style={styles.instructionText}>Review your recording</Text>
           </View>
         )}
 
@@ -448,9 +380,15 @@ export default function CareRecipientHome({ route, navigation }) {
                 style={styles.playButton}
                 onPress={handlePlayback}
               >
-                <Text style={styles.playButtonText}>
-                  {isPlaying ? '⏸' : '▶'}
-                </Text>
+                {isPlaying ? (
+                  <Image
+                    source={require('../../assets/playing.png')}
+                    style={styles.playButtonImage}
+                    resizeMode="contain"
+                  />
+                ) : (
+                  <Text style={styles.playButtonText}>▶</Text>
+                )}
               </TouchableOpacity>
               <Text style={styles.playbackText}>
                 {isPlaying ? 'Playing...' : 'Tap to play'}
@@ -460,15 +398,10 @@ export default function CareRecipientHome({ route, navigation }) {
             {/* Action Buttons */}
             <View style={styles.actionButtons}>
               <TouchableOpacity
-                style={[styles.actionButton, styles.uploadButton, uploading && styles.buttonDisabled]}
+                style={[styles.actionButton, styles.uploadButton]}
                 onPress={handleUpload}
-                disabled={uploading}
               >
-                {uploading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.actionButtonText}>📤 Upload</Text>
-                )}
+                <Text style={styles.actionButtonText}>📤 Upload</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -493,8 +426,8 @@ export default function CareRecipientHome({ route, navigation }) {
                 <Text style={styles.privacyButtonText}>🔒 Privacy Settings</Text>
                 <Text style={styles.privacySubtext}>
                   {excludedCaregivers.length === 0
-                    ? 'Visible to all caregivers'
-                    : `Hidden from ${excludedCaregivers.length} caregiver(s)`}
+                    ? ' Currently visible to all caregivers. Press to change.'
+                    : `Hidden from ${excludedCaregivers.length} caregiver(s). Press to change.`}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -511,7 +444,7 @@ export default function CareRecipientHome({ route, navigation }) {
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Privacy Settings</Text>
+            <Text style={styles.modalTitle}>🔒 Privacy Settings</Text>
             <Text style={styles.modalSubtitle}>
               Select caregivers to exclude from viewing this recording
             </Text>
@@ -565,13 +498,20 @@ export default function CareRecipientHome({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
   header: {
-    padding: 20,
     backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   headerTop: {
     flexDirection: 'row',
@@ -583,34 +523,37 @@ const styles = StyleSheet.create({
   },
   WelcomeText: {
     fontSize: 20,
-    color: '#666',
+    color: '#6c757d',
     marginBottom: 4,
+    fontWeight: '500',
   },
   nameText: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#1a1a1a',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   instructionText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 25,
+    color: '#495057',   
+    marginTop: 12,
+    textAlign: 'center',
+    fontWeight: '500',
   },
   logoutButton: {
-    backgroundColor: '#f44336',
+    backgroundColor: '#fee',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#fcc',
     marginLeft: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   logoutButtonText: {
-    color: 'white',
-    fontSize: 14,
+    color: '#f44336',
+    fontSize: 18,
     fontWeight: '600',
   },
   scrollContent: {
@@ -621,21 +564,43 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   durationText: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
+    marginTop: 8,
+  },
+  durationTextAbove: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#f44336',
+    textAlign: 'center',
+    letterSpacing: 1,
+  },
+  durationPlaceholder: {
+    height: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  recordingTextContainer: {
+    alignItems: 'center',
+    marginTop: 2,
   },
   recordingContainer: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingVertical: 60,
+    paddingTop: 100,
   },
   recordButton: {
     width: 200,
     height: 200,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 0,
+  },
+  micImage: {
+    width: 90,
+    height: 90,
   },
   recordButtonInner: {
     width: 140,
@@ -644,14 +609,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowColor: '#4CAF50',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 10,
   },
   recordingActive: {
     backgroundColor: '#f44336',
+    shadowColor: '#f44336',
   },
   recordIcon: {
     width: 60,
@@ -662,51 +628,68 @@ const styles = StyleSheet.create({
   recordIconStop: {
     borderRadius: 8,
   },
+  reviewInstructionContainer: {
+    alignItems: 'center',
+    paddingTop: 5,
+  },
   playbackSection: {
     padding: 20,
   },
   playbackCard: {
     backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 30,
+    borderRadius: 20,
+    padding: 32,
     alignItems: 'center',
     marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   playButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     backgroundColor: '#f44336',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
+    shadowColor: '#f44336',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   playButtonText: {
-    fontSize: 36,
+    fontSize: 40,
     color: 'white',
   },
+  playButtonImage: {
+    width: 120,
+    height: 120,
+  },
   playbackText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 23,
+    color: '#495057',
+    fontWeight: '500',
   },
   actionButtons: {
     marginBottom: 16,
   },
   actionButton: {
-    padding: 16,
-    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 14,
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 14,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
   },
   uploadButton: {
     backgroundColor: '#4CAF50',
@@ -719,61 +702,69 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 25,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   deleteButtonText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
+    fontSize: 25,
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
   privacyButton: {
     backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 12,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    borderRadius: 14,
     borderWidth: 2,
     borderColor: '#9C27B0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowColor: '#9C27B0',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
   },
   privacyButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 22,
+    fontWeight: 'bold',
     color: '#9C27B0',
-    marginBottom: 4,
+    marginBottom: 6,
+    letterSpacing: 0.5,
   },
   privacySubtext: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 18,
+    color: '#6c757d',
+    fontWeight: '500',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    padding: 28,
     maxHeight: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 10,
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+    color: '#1a1a1a',
+    marginBottom: 10,
   },
   modalSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 20,
+    fontSize: 22,
+    color: '#6c757d',
+    marginBottom: 24,
+    fontWeight: '500',
   },
   caregiverList: {
     maxHeight: 400,
@@ -782,40 +773,52 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
+    padding: 18,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 14,
     marginBottom: 12,
     borderWidth: 2,
-    borderColor: 'transparent',
+    borderColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   caregiverItemExcluded: {
     backgroundColor: '#ffebee',
     borderColor: '#f44336',
   },
   caregiverName: {
-    fontSize: 16,
+    fontSize: 21,
     fontWeight: '600',
-    color: '#333',
+    color: '#1a1a1a',
   },
   caregiverNameExcluded: {
-    color: '#666',
+    color: '#6c757d',
     textDecorationLine: 'line-through',
   },
   caregiverStatus: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
   },
   modalCloseButton: {
-    backgroundColor: '#4A90E2',
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: 'red',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 14,
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 20,
+    shadowColor: 'red',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   modalCloseButtonText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 22,
     fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
 });

@@ -7,8 +7,13 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import api from '../services/api';
+import { Colors, TextStyles, ButtonStyles, ContainerStyles, Shadows, BorderRadius, InputStyles } from '../styles/CommonStyles';
 
 export default function CareRecipientDetail({ route, navigation }) {
   const { recipient, caregiver } = route.params;
@@ -17,6 +22,23 @@ export default function CareRecipientDetail({ route, navigation }) {
   const [dailyData, setDailyData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Add shift modal state
+  const [showAddShiftModal, setShowAddShiftModal] = useState(false);
+  const [newShiftDate, setNewShiftDate] = useState('');
+  const [newShiftStartTime, setNewShiftStartTime] = useState('');
+  const [newShiftEndTime, setNewShiftEndTime] = useState('');
+  const [newShiftNotes, setNewShiftNotes] = useState('');
+  const [newShiftCaregiverName, setNewShiftCaregiverName] = useState('');
+
+  // Get today's date in YYYY-MM-DD format
+  const getTodayDate = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
   // Fetch shifts and recordings from backend
   useEffect(() => {
@@ -31,7 +53,37 @@ export default function CareRecipientDetail({ route, navigation }) {
       // Fetch shifts for this care recipient
       const shifts = await api.getShifts(recipient.id);
 
-      // Group data by date
+      // Mock caregiver data - in production, this would come from backend
+      const mockCaregivers = [
+        'Sarah Johnson',
+        'Michael Chen',
+        'Emma Williams',
+        'David Rodriguez',
+        'Lisa Anderson',
+        'James Martinez'
+      ];
+
+      // Mock shift activities - in production, this would come from backend
+      const mockShiftActivities = [
+        'Morning routine completed. Assisted with breakfast (oatmeal and tea). Administered morning medications at 9:00 AM. Went for a 20-minute walk in the garden. Patient in good spirits.',
+        'Afternoon shift. Lunch served at 12:30 PM (chicken soup and sandwich). Watched favorite TV show together. Assisted with personal hygiene. Blood pressure: 125/80. Mood: cheerful and talkative.',
+        'Evening care. Dinner at 6:00 PM (salmon with vegetables). Evening medications given. Read together for 30 minutes. Prepared for bed. All vitals normal. Patient resting comfortably.',
+        'Morning care provided. Breakfast included scrambled eggs and toast. Took medications as scheduled. Physical therapy exercises completed (15 minutes). Patient reports feeling well.',
+        'Mid-day shift. Assisted with lunch and hydration. Changed bedding. Social time with other residents. Monitored throughout the shift. No concerns noted.',
+        'Night shift beginning. Dinner provided and medications administered. Evening routine completed. Patient settled for the night. Vitals checked and recorded.',
+      ];
+
+      // Mock shift times
+      const shiftTimes = [
+        { start: '08:00', end: '14:00' },
+        { start: '14:00', end: '20:00' },
+        { start: '20:00', end: '02:00' },
+        { start: '06:00', end: '12:00' },
+        { start: '12:00', end: '18:00' },
+        { start: '18:00', end: '00:00' },
+      ];
+
+      // Group data by date and track shift numbers per day
       const groupedByDate = {};
 
       for (const shift of shifts) {
@@ -46,7 +98,15 @@ export default function CareRecipientDetail({ route, navigation }) {
           };
         }
 
-        // Add shift info (backend doesn't have detailed shift notes yet, so we'll show basic info)
+        // Calculate shift number for THIS specific day (starts at 1 for each day)
+        const shiftNumberForDay = groupedByDate[shiftDate].shifts.length + 1;
+
+        // Create a shift index for mock data variety
+        const shiftIndex = (shift.shift_number - 1) % mockCaregivers.length;
+        const timeIndex = (shift.shift_number - 1) % shiftTimes.length;
+        const activityIndex = (shift.shift_number - 1) % mockShiftActivities.length;
+
+        // Add shift info with mock caregiver data
         groupedByDate[shiftDate].shifts.push({
           id: shift.id, // Include the shift ID from backend
           shiftNumber: shift.shift_number,
@@ -120,6 +180,85 @@ export default function CareRecipientDetail({ route, navigation }) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const toggleShiftExpansion = (dayIndex, shiftIndex) => {
+    const updatedData = [...dailyData];
+    const shift = updatedData[dayIndex].shifts[shiftIndex];
+    shift.expanded = !shift.expanded;
+    setDailyData(updatedData);
+  };
+
+  const handleAddShift = () => {
+    if (!newShiftDate || !newShiftStartTime || !newShiftEndTime || !newShiftNotes.trim() || !newShiftCaregiverName.trim()) {
+      Alert.alert('Missing Information', 'Please fill in all fields');
+      return;
+    }
+
+    // Validate time format (HH:MM)
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/;
+    if (!timeRegex.test(newShiftStartTime) || !timeRegex.test(newShiftEndTime)) {
+      Alert.alert('Invalid Time Format', 'Please enter times in HH:MM format (e.g., 08:00, 14:00)');
+      return;
+    }
+
+    // Convert times to minutes for comparison
+    const [startHour, startMinute] = newShiftStartTime.split(':').map(Number);
+    const [endHour, endMinute] = newShiftEndTime.split(':').map(Number);
+    const startTimeInMinutes = startHour * 60 + startMinute;
+    const endTimeInMinutes = endHour * 60 + endMinute;
+
+    // Check if end time is before start time
+    if (endTimeInMinutes <= startTimeInMinutes) {
+      Alert.alert(
+        'Invalid Time Range',
+        'End time must be after start time. For overnight shifts, please create separate entries for each day.'
+      );
+      return;
+    }
+
+    // Find or create day group
+    const updatedData = [...dailyData];
+    let dayIndex = updatedData.findIndex(d => d.date === newShiftDate);
+
+    const newShift = {
+      id: `shift-${Date.now()}`,
+      shiftNumber: 1,
+      caregiverName: newShiftCaregiverName,
+      startTime: newShiftStartTime,
+      endTime: newShiftEndTime,
+      time: `${newShiftStartTime} - ${newShiftEndTime}`,
+      notes: newShiftNotes,
+      expanded: false,
+    };
+
+    if (dayIndex >= 0) {
+      // Day exists, add shift
+      newShift.shiftNumber = updatedData[dayIndex].shifts.length + 1;
+      updatedData[dayIndex].shifts.push(newShift);
+    } else {
+      // Create new day
+      updatedData.unshift({
+        date: newShiftDate,
+        displayDate: formatDisplayDate(newShiftDate),
+        shifts: [newShift],
+        recordings: [],
+      });
+    }
+
+    // Sort by date
+    updatedData.sort((a, b) => new Date(b.date) - new Date(a.date));
+    setDailyData(updatedData);
+
+    // Reset form
+    setNewShiftDate('');
+    setNewShiftStartTime('');
+    setNewShiftEndTime('');
+    setNewShiftNotes('');
+    setNewShiftCaregiverName('');
+    setShowAddShiftModal(false);
+
+    Alert.alert('Success', 'Shift added successfully!');
+  };
+
   const handleRecordingPress = (recording, day) => {
     const shift = day.shifts[0]; // You can implement logic to match recording to specific shift
     navigation.navigate('RecordingDetail', {
@@ -148,6 +287,13 @@ export default function CareRecipientDetail({ route, navigation }) {
     navigation.navigate('RecipientProfile', { recipient });
   };
 
+  const handleGroupChat = () => {
+    navigation.navigate('CaregiverGroupChat', {
+      recipient,
+      caregiver
+    });
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -161,9 +307,17 @@ export default function CareRecipientDetail({ route, navigation }) {
             <Text style={styles.headerText}>Room: {recipient.room}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.profileButton} onPress={handleViewProfile}>
-          <Text style={styles.profileButtonText}>View Full Profile</Text>
-        </TouchableOpacity>
+
+        {/* Button Container for Profile and Group Chat */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity style={styles.profileButton} onPress={handleViewProfile}>
+            <Text style={styles.profileButtonText}>View Full Profile</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.groupChatButton} onPress={handleGroupChat}>
+            <Text style={styles.groupChatButtonText}>Group Chat with Caregivers</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Daily Data */}
@@ -205,23 +359,50 @@ export default function CareRecipientDetail({ route, navigation }) {
                 <TouchableOpacity
                   key={shiftIndex}
                   style={styles.shiftBox}
-                  onPress={() => handleShiftPress(shift, day.date)}
+                  onPress={() => toggleShiftExpansion(dayIndex, shiftIndex)}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.shiftHeader}>
-                    <View style={styles.shiftBadge}>
-                      <Text style={styles.shiftBadgeText}>Shift {shift.shiftNumber}</Text>
+                  {/* Shift Summary - Always Visible */}
+                  <View style={styles.shiftSummaryContainer}>
+                    <View style={styles.shiftHeader}>
+                      <View style={styles.caregiverInfoContainer}>
+                        <View style={styles.caregiverAvatar}>
+                          <Text style={styles.caregiverAvatarText}>
+                            {shift.caregiverName ? shift.caregiverName.split(' ').map(n => n[0]).join('') : 'S' + shift.shiftNumber}
+                          </Text>
+                        </View>
+                        <View style={styles.shiftMainInfo}>
+                          <Text style={styles.shiftCaregiver}>
+                            {shift.caregiverName || `Shift ${shift.shiftNumber}`}
+                          </Text>
+                          <Text style={styles.shiftTime}>
+                            {shift.time || shift.startTime && shift.endTime ? `${shift.startTime} - ${shift.endTime}` : `Shift ${shift.shiftNumber}`}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.shiftBadge}>
+                        <Text style={styles.shiftBadgeText}>
+                          Shift {shift.shiftNumber}
+                        </Text>
+                      </View>
                     </View>
-                    <Text style={styles.shiftTime}>{shift.time}</Text>
+
+                    {/* Expand Indicator */}
+                    <Text style={styles.expandIndicator}>
+                      {shift.expanded ? '▼ Tap to collapse' : '▶ Tap for details'}
+                    </Text>
                   </View>
-                  <Text style={styles.shiftCaregiver}> {shift.caregiverName}</Text>
-                  <View style={styles.notesBox}>
-                    <Text style={styles.notesLabel}>Tap to view/add shift notes</Text>
-                    <Text style={styles.notesText}>{shift.notes}</Text>
-                  </View>
-                  <View style={styles.shiftArrowContainer}>
-                    <Text style={styles.shiftArrow}>›</Text>
-                  </View>
+
+                  {/* Expanded Notes */}
+                  {shift.expanded && (
+                    <View style={styles.shiftDetails}>
+                      <View style={styles.divider} />
+                      <Text style={styles.notesLabel}>Shift Notes:</Text>
+                      <Text style={styles.notesText}>
+                        {shift.notes || 'No notes available for this shift. Tap "+" to add notes.'}
+                      </Text>
+                    </View>
+                  )}
                 </TouchableOpacity>
               ))}
             </View>
@@ -272,32 +453,112 @@ export default function CareRecipientDetail({ route, navigation }) {
           ))
         )}
       </ScrollView>
+
+      {/* Add Shift Button */}
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={() => {
+          setNewShiftDate(getTodayDate());
+          setNewShiftCaregiverName(caregiver?.name || '');
+          setShowAddShiftModal(true);
+        }}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.addButtonText}>+</Text>
+      </TouchableOpacity>
+
+      {/* Add Shift Modal */}
+      <Modal
+        visible={showAddShiftModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAddShiftModal(false)}
+      >
+        <KeyboardAvoidingView
+          style={styles.modalContainer}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add New Shift</Text>
+              <TouchableOpacity onPress={() => setShowAddShiftModal(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.inputLabel}>Caregiver Name</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Enter caregiver name"
+                placeholderTextColor={Colors.gray400}
+                value={newShiftCaregiverName}
+                onChangeText={setNewShiftCaregiverName}
+              />
+
+              <Text style={styles.inputLabel}>Date (YYYY-MM-DD)</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="2026-01-15"
+                placeholderTextColor={Colors.gray400}
+                value={newShiftDate}
+                onChangeText={setNewShiftDate}
+              />
+
+              <Text style={styles.inputLabel}>Start Time (HH:MM)</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder=" e.g. 08:00"
+                placeholderTextColor={Colors.gray400}
+                value={newShiftStartTime}
+                onChangeText={setNewShiftStartTime}
+              />
+
+              <Text style={styles.inputLabel}>End Time (HH:MM)</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="e.g. 14:00"
+                placeholderTextColor={Colors.gray400}
+                value={newShiftEndTime}
+                onChangeText={setNewShiftEndTime}
+              />
+
+              <Text style={styles.inputLabel}>Shift Notes</Text>
+              <TextInput
+                style={[styles.modalInput, styles.notesInput]}
+                placeholder="Describe activities, meals, medications, mood, etc."
+                placeholderTextColor={Colors.gray400}
+                value={newShiftNotes}
+                onChangeText={setNewShiftNotes}
+                multiline
+                numberOfLines={6}
+                textAlignVertical="top"
+              />
+
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={handleAddShift}
+              >
+                <Text style={styles.submitButtonText}>Add Shift</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#f8f9fa',
+    ...ContainerStyles.screen,
+    backgroundColor: Colors.gray50,
   },
   header: {
-    backgroundColor: 'white',
-    paddingTop: 20,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    ...ContainerStyles.headerRounded,
   },
   recipientName: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    ...TextStyles.h2,
     marginBottom: 12,
   },
   headerDetails: {
@@ -308,12 +569,12 @@ const styles = StyleSheet.create({
   headerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: Colors.gray50,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: Colors.gray200,
   },
   headerIcon: {
     fontSize: 16,
@@ -321,70 +582,76 @@ const styles = StyleSheet.create({
   },
   headerText: {
     fontSize: 14,
-    color: '#495057',
+    color: Colors.gray700,
     fontWeight: '600',
+  },
+  buttonContainer: {
+    gap: 12,
   },
   profileButton: {
-    backgroundColor: 'red',
+    ...ButtonStyles.base,
+    backgroundColor: Colors.primary,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#4A90E2',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
+    flexDirection: 'row',
   },
   profileButtonText: {
-    color: 'white',
+    ...TextStyles.buttonText,
     fontSize: 16,
-    fontWeight: '600',
+    textAlign: 'center',
+    flex: 1,
+    lineHeight: 20,
+  },
+  groupChatButton: {
+    ...ButtonStyles.base,
+    backgroundColor: '#FF9A76',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    ...Shadows.medium,
+  },
+  groupChatButtonText: {
+    ...TextStyles.buttonText,
+    fontSize: 16,
+    color: Colors.white,
+    textAlign: 'center',
+    flex: 1,
+    lineHeight: 20,
   },
   scrollContainer: {
     flex: 1,
     padding: 20,
   },
   dayBox: {
-    backgroundColor: 'white',
-    borderRadius: 20,
-    padding: 20,
+    ...ContainerStyles.cardLarge,
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 4,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: Colors.gray200,
   },
   dayHeader: {
     marginBottom: 16,
     paddingBottom: 16,
     borderBottomWidth: 2,
-    borderBottomColor: 'red',
+    borderBottomColor: Colors.primary,
   },
   dayTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    ...TextStyles.h3,
     marginBottom: 4,
   },
   dayDate: {
-    fontSize: 14,
-    color: '#6c757d',
-    fontWeight: '500',
+    ...TextStyles.small,
+    color: Colors.gray600,
   },
   shiftsContainer: {
     marginBottom: 16,
   },
   shiftBox: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 16,
+    backgroundColor: Colors.gray50,
+    borderRadius: BorderRadius.lg,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#dee2e6',
+    borderColor: Colors.gray300,
     position: 'relative',
   },
   shiftHeader: {
@@ -394,43 +661,43 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   shiftBadge: {
-    backgroundColor: 'red',
+    backgroundColor: Colors.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: BorderRadius.sm,
   },
   shiftBadgeText: {
-    color: 'white',
+    color: Colors.white,
     fontSize: 13,
     fontWeight: 'bold',
   },
   shiftTime: {
     fontSize: 13,
-    color: '#6c757d',
+    color: Colors.gray600,
     fontWeight: '600',
   },
   shiftCaregiver: {
     fontSize: 15,
-    color: '#495057',
+    color: Colors.gray700,
     fontWeight: '600',
     marginBottom: 10,
   },
   notesBox: {
-    backgroundColor: 'white',
+    backgroundColor: Colors.white,
     padding: 12,
     borderRadius: 10,
     borderLeftWidth: 4,
-    borderLeftColor: 'red',
+    borderLeftColor: Colors.primary,
   },
   notesLabel: {
     fontSize: 12,
-    color: '#6c757d',
+    color: Colors.gray600,
     fontWeight: '600',
     marginBottom: 6,
   },
   notesText: {
     fontSize: 14,
-    color: '#212529',
+    color: Colors.text,
     lineHeight: 20,
   },
   shiftArrowContainer: {
@@ -441,7 +708,7 @@ const styles = StyleSheet.create({
   },
   shiftArrow: {
     fontSize: 28,
-    color: '#adb5bd',
+    color: Colors.gray500,
     fontWeight: 'bold',
   },
   recordingsContainer: {
@@ -457,22 +724,16 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   recordingsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
+    ...TextStyles.h4,
   },
   recordingBox: {
     backgroundColor: '#fff5e6',
-    borderRadius: 12,
+    borderRadius: BorderRadius.md,
     padding: 14,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: '#ffe0b2',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    ...Shadows.small,
   },
   recordingContent: {
     flexDirection: 'row',
@@ -482,13 +743,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#ff9800',
+    backgroundColor: Colors.warning,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
   },
   recordingIconText: {
-    color: 'white',
+    color: Colors.white,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -498,12 +759,12 @@ const styles = StyleSheet.create({
   recordingTime: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1a1a1a',
+    color: Colors.text,
     marginBottom: 4,
   },
   recordingDuration: {
     fontSize: 14,
-    color: '#6c757d',
+    color: Colors.gray600,
     fontWeight: '500',
   },
   notesBadge: {
@@ -516,51 +777,48 @@ const styles = StyleSheet.create({
   },
   notesBadgeText: {
     fontSize: 12,
-    color: '#1976d2',
+    color: Colors.info,
     fontWeight: '600',
   },
   recordingArrow: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#ff9800',
+    backgroundColor: Colors.warning,
     justifyContent: 'center',
     alignItems: 'center',
   },
   arrow: {
     fontSize: 20,
-    color: 'white',
+    color: Colors.white,
     fontWeight: 'bold',
   },
   noRecordingsBox: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: Colors.gray50,
     padding: 20,
-    borderRadius: 12,
+    borderRadius: BorderRadius.md,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#dee2e6',
+    borderColor: Colors.gray300,
     borderStyle: 'dashed',
   },
   noRecordingsText: {
-    fontSize: 14,
-    color: '#adb5bd',
+    ...TextStyles.small,
+    color: Colors.gray500,
     fontStyle: 'italic',
   },
   loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    ...ContainerStyles.centered,
     paddingVertical: 60,
   },
   loadingText: {
-    fontSize: 16,
-    color: '#6c757d',
+    ...TextStyles.body,
+    color: Colors.gray600,
     marginTop: 16,
-    fontWeight: '500',
   },
   errorContainer: {
-    backgroundColor: '#fee',
-    borderRadius: 12,
+    backgroundColor: Colors.primaryLight,
+    borderRadius: BorderRadius.md,
     padding: 24,
     margin: 20,
     alignItems: 'center',
@@ -575,30 +833,146 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   retryButton: {
-    backgroundColor: 'red',
+    ...ButtonStyles.base,
+    backgroundColor: Colors.primary,
     paddingVertical: 10,
     paddingHorizontal: 24,
-    borderRadius: 8,
   },
   retryButtonText: {
-    color: 'white',
+    ...TextStyles.buttonText,
     fontSize: 15,
-    fontWeight: '600',
   },
   emptyContainer: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 12,
+    backgroundColor: Colors.gray50,
+    borderRadius: BorderRadius.md,
     padding: 40,
     margin: 20,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#dee2e6',
+    borderColor: Colors.gray300,
     borderStyle: 'dashed',
   },
   emptyText: {
-    fontSize: 16,
-    color: '#adb5bd',
+    ...TextStyles.body,
+    color: Colors.gray500,
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  caregiverInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  caregiverAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  caregiverAvatarText: {
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  shiftMainInfo: {
+    flex: 1,
+  },
+  shiftSummaryContainer: {
+    width: '100%',
+  },
+  shiftDetails: {
+    marginTop: 12,
+    paddingTop: 12,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.gray300,
+    marginBottom: 12,
+  },
+  expandIndicator: {
+    fontSize: 12,
+    color: Colors.primary,
+    fontWeight: '500',
+    marginTop: 8,
+  },
+  addButton: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: Colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Shadows.large,
+  },
+  addButtonText: {
+    color: Colors.white,
+    fontSize: 32,
+    fontWeight: '300',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    padding: 24,
+    maxHeight: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: Colors.text,
+  },
+  modalClose: {
+    fontSize: 28,
+    color: Colors.gray600,
+    fontWeight: '300',
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.text,
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  modalInput: {
+    ...InputStyles.rounded,
+    fontSize: 15,
+    marginBottom: 8,
+  },
+  notesInput: {
+    height: 120,
+    textAlignVertical: 'top',
+    paddingTop: 12,
+  },
+  submitButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 16,
+    borderRadius: BorderRadius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 16,
+    ...Shadows.medium,
+  },
+  submitButtonText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

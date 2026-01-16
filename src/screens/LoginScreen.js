@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
- import {
+import {
   View,
   Text,
   TextInput,
@@ -9,6 +9,7 @@ import React, { useState } from 'react';
   ImageBackground,
 } from 'react-native';
 import { mockUsers } from '../data/mockData';
+import { Colors, TextStyles, InputStyles, ButtonStyles, Shadows } from '../styles/CommonStyles';
 
 export default function LoginScreen({ navigation, setUser }) {
   const [userId, setUserId] = useState('');
@@ -86,7 +87,7 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.5)', // Semi-transparent white overlay
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
   },
   container: {
     flex: 1,
@@ -98,63 +99,45 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 400,
     padding: 32,
-    backgroundColor: 'white',
+    backgroundColor: Colors.white,
     borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 8,
+    ...Shadows.large,
   },
   title: {
-    fontSize: 50, // Made much larger
+    fontSize: 50,
     fontWeight: 'bold',
-    color: '#dc2626', // Red color
-    marginBottom: 4, // Reduced spacing
+    color: Colors.primary,
+    marginBottom: 4,
     textAlign: 'center',
     letterSpacing: 2.5,
     fontFamily: 'Helvetica',
   },
   subtitle: {
     fontSize: 18,
-    color: '#6b7280',
-    marginBottom: 5, // Reduced spacing
+    color: Colors.textGray,
+    marginBottom: 5,
     textAlign: 'center',
   },
   input: {
-    borderWidth: 2,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 16,
-    fontSize: 16,
+    ...InputStyles.base,
+    borderColor: Colors.gray400,
     marginBottom: 20,
-    backgroundColor: '#fff',
   },
   button: {
-    backgroundColor: '#dc2626', // Red color
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
+    ...ButtonStyles.base,
+    ...ButtonStyles.primary,
   },
   buttonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
+    ...TextStyles.buttonText,
   },
   helpSection: {
     marginTop: 24,
     paddingTop: 24,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
+    borderTopColor: Colors.gray200,
   },
   helpText: {
-    fontSize: 14,
-    color: '#6b7280',
+    ...TextStyles.small,
     textAlign: 'center',
     lineHeight: 20,
   },
@@ -163,11 +146,11 @@ const styles = StyleSheet.create({
   },
   brandingText: {
     fontSize: 13,
-    color: 'black',
+    color: Colors.black,
     textAlign: 'center',
   },
   brandingBold: {
     fontWeight: '600',
-    color: '#374151',
+    color: Colors.gray700,
   },
 });
