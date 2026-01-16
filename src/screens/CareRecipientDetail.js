@@ -48,10 +48,12 @@ export default function CareRecipientDetail({ route, navigation }) {
 
         // Add shift info (backend doesn't have detailed shift notes yet, so we'll show basic info)
         groupedByDate[shiftDate].shifts.push({
+          id: shift.id, // Include the shift ID from backend
           shiftNumber: shift.shift_number,
           caregiverName: 'Shift ' + shift.shift_number, // Backend doesn't have caregiver name in shift
           time: 'Shift ' + shift.shift_number,
           notes: `Shift ${shift.shift_number} - ${shiftDate}`,
+          day: shift.day,
         });
 
         // Add recordings for this shift and fetch their note counts

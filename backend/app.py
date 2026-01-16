@@ -3,11 +3,24 @@ from flask_cors import CORS
 import sqlite3
 from datetime import datetime
 import os
+from dotenv import load_dotenv
+from gemini_service import GeminiService
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for React Native app
 
 DATABASE = 'elderly_care.db'
+
+# Initialize Gemini service (will be None if API key not configured)
+try:
+    gemini_service = GeminiService()
+    print("Gemini AI service initialized successfully!")
+except Exception as e:
+    gemini_service = None
+    print(f"Warning: Gemini AI service not available: {e}")
 
 def get_db():
     """Get database connection"""
@@ -467,6 +480,109 @@ def get_care_recipient(recipient_id):
     if recipient:
         return jsonify(dict(recipient))
     return jsonify({'error': 'Care recipient not found'}), 404
+
+# ============= AI/GEMINI ENDPOINTS =============
+
+@app.route('/shifts/<shift_id>/analyze', methods=['POST'])
+def analyze_shift_notes(shift_id):
+    """
+    Analyze shift notes using Gemini AI and provide suggestions
+    """
+    if not gemini_service:
+        return jsonify({
+            'error': 'AI service not available. Please configure GEMINI_API_KEY in .env file.'
+        }), 503
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Get shift information
+    cursor.execute('SELECT * FROM shifts WHERE id = ?', (shift_id,))
+    shift = cursor.fetchone()
+
+    if not shift:
+        conn.close()
+        return jsonify({'error': 'Shift not found'}), 404
+
+    shift_dict = dict(shift)
+
+    # Get care recipient name
+    cursor.execute('SELECT name FROM care_recipients WHERE id = ?', (shift_dict['care_recipient_id'],))
+    recipient = cursor.fetchone()
+    care_recipient_name = dict(recipient)['name'] if recipient else None
+
+    # Get all shift notes
+    cursor.execute('''
+        SELECT * FROM shift_notes
+        WHERE shift_id = ?
+        ORDER BY timestamp ASC
+    ''', (shift_id,))
+    notes = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    if not notes:
+        return jsonify({
+            'suggestions': [],
+            'summary': 'No shift notes available for this shift.',
+            'priorities': []
+        })
+
+    # Prepare shift context
+    shift_context = {
+        'shift_number': shift_dict.get('shift_number'),
+        'date': shift_dict.get('date'),
+        'day': shift_dict.get('day')
+    }
+
+    # Call Gemini service to analyze notes
+    try:
+        analysis = gemini_service.analyze_shift_notes(
+            shift_notes=notes,
+            care_recipient_name=care_recipient_name,
+            shift_context=shift_context
+        )
+        return jsonify(analysis)
+    except Exception as e:
+        return jsonify({
+            'error': f'Error analyzing shift notes: {str(e)}',
+            'suggestions': [],
+            'summary': '',
+            'priorities': []
+        }), 500
+
+@app.route('/shifts/<shift_id>/summary', methods=['GET'])
+def get_shift_summary(shift_id):
+    """
+    Generate a concise AI summary of shift notes
+    """
+    if not gemini_service:
+        return jsonify({
+            'error': 'AI service not available. Please configure GEMINI_API_KEY in .env file.'
+        }), 503
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Get all shift notes
+    cursor.execute('''
+        SELECT * FROM shift_notes
+        WHERE shift_id = ?
+        ORDER BY timestamp ASC
+    ''', (shift_id,))
+    notes = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    if not notes:
+        return jsonify({'summary': 'No notes recorded for this shift.'})
+
+    try:
+        summary = gemini_service.generate_shift_summary(notes)
+        return jsonify({'summary': summary})
+    except Exception as e:
+        return jsonify({
+            'error': f'Error generating summary: {str(e)}',
+            'summary': ''
+        }), 500
 
 if __name__ == '__main__':
     # Initialize database on first run
