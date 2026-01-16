@@ -69,7 +69,7 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS recordings (
             id TEXT PRIMARY KEY,
-            shift_id TEXT NOT NULL,
+            shift_id TEXT,
             care_recipient_id TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             duration INTEGER,
@@ -279,10 +279,11 @@ def create_recording():
     data = request.json
     print(f"Request data: {data}")
 
-    if not data.get('care_recipient_id') or not data.get('shift_id'):
-        print("ERROR: Missing required fields")
-        return jsonify({'error': 'care_recipient_id and shift_id are required'}), 400
+    if not data.get('care_recipient_id'):
+        print("ERROR: Missing required field: care_recipient_id")
+        return jsonify({'error': 'care_recipient_id is required'}), 400
 
+    # shift_id is now optional - recording can exist without a shift
     recording_id = f"R{int(datetime.now().timestamp() * 1000)}"
     timestamp = datetime.now().isoformat()
 
@@ -410,7 +411,7 @@ def delete_shift_note(note_id):
 
 @app.route('/shifts', methods=['GET'])
 def get_shifts():
-    """Get all shifts"""
+    """Get all shifts with recordings and shift notes"""
     care_recipient_id = request.args.get('care_recipient_id')
 
     conn = get_db()
@@ -423,13 +424,94 @@ def get_shifts():
 
     shifts = [dict(row) for row in cursor.fetchall()]
 
-    # Get recordings for each shift
+    # Get recordings and shift notes for each shift
     for shift in shifts:
         cursor.execute('SELECT * FROM recordings WHERE shift_id = ?', (shift['id'],))
         shift['recordings'] = [dict(row) for row in cursor.fetchall()]
 
+        cursor.execute('SELECT * FROM shift_notes WHERE shift_id = ? ORDER BY timestamp DESC', (shift['id'],))
+        shift_notes = [dict(row) for row in cursor.fetchall()]
+        shift['shift_notes'] = shift_notes
+
+        # Add formatted time and caregiver name to shift if shift notes exist
+        if shift_notes:
+            first_note = shift_notes[0]
+            shift['time'] = f"{shift['date']}"
+            shift['caregiverName'] = first_note['caregiver_name']
+            shift['notes'] = first_note['content']
+
     conn.close()
     return jsonify(shifts)
+
+@app.route('/shifts', methods=['POST'])
+def create_shift():
+    """Create a new shift with optional shift notes"""
+    data = request.json
+    print("=== RECEIVED POST /shifts REQUEST ===")
+    print(f"Request data: {data}")
+
+    if not data.get('care_recipient_id') or not data.get('date'):
+        return jsonify({'error': 'care_recipient_id and date are required'}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+
+    # Get the next shift number for this care recipient
+    cursor.execute(
+        'SELECT MAX(shift_number) as max_shift FROM shifts WHERE care_recipient_id = ?',
+        (data.get('care_recipient_id'),)
+    )
+    result = cursor.fetchone()
+    next_shift_number = (result['max_shift'] or 0) + 1
+
+    # Generate shift ID
+    shift_id = f"S{int(datetime.now().timestamp() * 1000)}"
+
+    # Insert the shift
+    cursor.execute('''
+        INSERT INTO shifts (id, care_recipient_id, shift_number, day, date)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (
+        shift_id,
+        data.get('care_recipient_id'),
+        next_shift_number,
+        data.get('day', next_shift_number),
+        data.get('date')
+    ))
+
+    # If shift notes are provided, create a shift note
+    if data.get('notes') and data.get('caregiver_id'):
+        note_id = f"SN{int(datetime.now().timestamp() * 1000)}"
+        timestamp = datetime.now().isoformat()
+
+        cursor.execute('''
+            INSERT INTO shift_notes (id, shift_id, caregiver_id, caregiver_name, content, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            note_id,
+            shift_id,
+            data.get('caregiver_id'),
+            data.get('caregiver_name', 'Unknown Caregiver'),
+            data.get('notes'),
+            timestamp
+        ))
+        print(f"Created shift note {note_id} for shift {shift_id}")
+
+    conn.commit()
+
+    # Return the created shift
+    cursor.execute('SELECT * FROM shifts WHERE id = ?', (shift_id,))
+    shift = dict(cursor.fetchone())
+    shift['recordings'] = []
+
+    # Include shift notes if they exist
+    cursor.execute('SELECT * FROM shift_notes WHERE shift_id = ?', (shift_id,))
+    shift['shift_notes'] = [dict(row) for row in cursor.fetchall()]
+
+    conn.close()
+
+    print(f"SUCCESS: Created shift {shift_id}")
+    return jsonify(shift), 201
 
 # ============= USERS ENDPOINTS =============
 

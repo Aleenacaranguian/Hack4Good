@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,12 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  RefreshControl,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
 import { Colors, TextStyles, ButtonStyles, ContainerStyles, Shadows, BorderRadius, InputStyles } from '../styles/CommonStyles';
+import { Bot } from 'lucide-react-native';
 
 export default function CareRecipientDetail({ route, navigation }) {
   const { recipient, caregiver } = route.params;
@@ -21,6 +24,7 @@ export default function CareRecipientDetail({ route, navigation }) {
   // State management
   const [dailyData, setDailyData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
 
   // Add shift modal state
@@ -30,6 +34,12 @@ export default function CareRecipientDetail({ route, navigation }) {
   const [newShiftEndTime, setNewShiftEndTime] = useState('');
   const [newShiftNotes, setNewShiftNotes] = useState('');
   const [newShiftCaregiverName, setNewShiftCaregiverName] = useState('');
+
+  // AI analysis modal state
+  const [showAiAnalysisModal, setShowAiAnalysisModal] = useState(false);
+  const [aiAnalysisLoading, setAiAnalysisLoading] = useState(false);
+  const [aiAnalysisData, setAiAnalysisData] = useState(null);
+  const [selectedDayForAnalysis, setSelectedDayForAnalysis] = useState(null);
 
   // Get today's date in YYYY-MM-DD format
   const getTodayDate = () => {
@@ -45,47 +55,33 @@ export default function CareRecipientDetail({ route, navigation }) {
     fetchShiftsAndRecordings();
   }, [recipient.id]);
 
-  const fetchShiftsAndRecordings = async () => {
+  // Auto-refresh when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('[CareRecipientDetail] Screen focused, refreshing data...');
+      fetchShiftsAndRecordings();
+    }, [recipient.id])
+  );
+
+  const fetchShiftsAndRecordings = async (isRefreshing = false) => {
     try {
-      setLoading(true);
+      if (isRefreshing) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
       setError(null);
 
       // Fetch shifts for this care recipient
       const shifts = await api.getShifts(recipient.id);
 
-      // Mock caregiver data - in production, this would come from backend
-      const mockCaregivers = [
-        'Sarah Johnson',
-        'Michael Chen',
-        'Emma Williams',
-        'David Rodriguez',
-        'Lisa Anderson',
-        'James Martinez'
-      ];
+      // Fetch ALL recordings for this care recipient (including orphaned ones)
+      const allRecordings = await api.getRecordings(recipient.id);
 
-      // Mock shift activities - in production, this would come from backend
-      const mockShiftActivities = [
-        'Morning routine completed. Assisted with breakfast (oatmeal and tea). Administered morning medications at 9:00 AM. Went for a 20-minute walk in the garden. Patient in good spirits.',
-        'Afternoon shift. Lunch served at 12:30 PM (chicken soup and sandwich). Watched favorite TV show together. Assisted with personal hygiene. Blood pressure: 125/80. Mood: cheerful and talkative.',
-        'Evening care. Dinner at 6:00 PM (salmon with vegetables). Evening medications given. Read together for 30 minutes. Prepared for bed. All vitals normal. Patient resting comfortably.',
-        'Morning care provided. Breakfast included scrambled eggs and toast. Took medications as scheduled. Physical therapy exercises completed (15 minutes). Patient reports feeling well.',
-        'Mid-day shift. Assisted with lunch and hydration. Changed bedding. Social time with other residents. Monitored throughout the shift. No concerns noted.',
-        'Night shift beginning. Dinner provided and medications administered. Evening routine completed. Patient settled for the night. Vitals checked and recorded.',
-      ];
-
-      // Mock shift times
-      const shiftTimes = [
-        { start: '08:00', end: '14:00' },
-        { start: '14:00', end: '20:00' },
-        { start: '20:00', end: '02:00' },
-        { start: '06:00', end: '12:00' },
-        { start: '12:00', end: '18:00' },
-        { start: '18:00', end: '00:00' },
-      ];
-
-      // Group data by date and track shift numbers per day
+      // Group data by date
       const groupedByDate = {};
 
+      // First, process existing shifts from the backend
       for (const shift of shifts) {
         const shiftDate = shift.date;
 
@@ -98,21 +94,33 @@ export default function CareRecipientDetail({ route, navigation }) {
           };
         }
 
-        // Calculate shift number for THIS specific day (starts at 1 for each day)
-        const shiftNumberForDay = groupedByDate[shiftDate].shifts.length + 1;
+        // Extract time and notes from shift notes
+        let shiftTime = '';
+        let shiftNotes = '';
 
-        // Create a shift index for mock data variety
-        const shiftIndex = (shift.shift_number - 1) % mockCaregivers.length;
-        const timeIndex = (shift.shift_number - 1) % shiftTimes.length;
-        const activityIndex = (shift.shift_number - 1) % mockShiftActivities.length;
+        if (shift.notes) {
+          // Check if notes contain time format (HH:MM - HH:MM)
+          const timePattern = /(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})/;
+          const match = shift.notes.match(timePattern);
 
-        // Add shift info with mock caregiver data
+          if (match) {
+            shiftTime = match[1];
+            // Remove the time from notes, leaving only the actual notes
+            shiftNotes = shift.notes.replace(timePattern, '').trim();
+            // Remove leading newlines
+            shiftNotes = shiftNotes.replace(/^\n+/, '');
+          } else {
+            shiftNotes = shift.notes;
+          }
+        }
+
+        // Add shift info
         groupedByDate[shiftDate].shifts.push({
-          id: shift.id, // Include the shift ID from backend
-          shiftNumber: shift.shift_number,
-          caregiverName: 'Shift ' + shift.shift_number, // Backend doesn't have caregiver name in shift
-          time: 'Shift ' + shift.shift_number,
-          notes: `Shift ${shift.shift_number} - ${shiftDate}`,
+          id: shift.id,
+          shiftNumber: shift.shiftNumber || shift.shift_number,
+          caregiverName: shift.caregiverName || `Shift ${shift.shift_number}`,
+          time: shiftTime || shift.time || '',
+          notes: shiftNotes || `No notes available for this shift`,
           day: shift.day,
         });
 
@@ -124,26 +132,106 @@ export default function CareRecipientDetail({ route, navigation }) {
 
             groupedByDate[shiftDate].recordings.push({
               ...recording,
-              notes: notes, // Include the actual notes for count
+              notes: notes,
               uploadedBy: recipient.name,
             });
           }
         }
       }
 
-      // Convert to array and sort by date (most recent first)
-      const dailyDataArray = Object.values(groupedByDate).sort(
-        (a, b) => new Date(b.date) - new Date(a.date)
-      );
+      // Process orphaned recordings (recordings without shifts)
+      for (const recording of allRecordings) {
+        // Skip if this recording already belongs to a shift
+        if (recording.shiftId || recording.shift_id) {
+          continue;
+        }
+
+        // Extract date from recording timestamp
+        const recordingDate = recording.timestamp.split('T')[0];
+
+        if (!groupedByDate[recordingDate]) {
+          groupedByDate[recordingDate] = {
+            date: recordingDate,
+            displayDate: formatDisplayDate(recordingDate),
+            shifts: [],
+            recordings: [],
+          };
+        }
+
+        // Fetch notes for the recording
+        const notes = await api.getNotes(recording.id);
+
+        // Add orphaned recording to the appropriate date
+        groupedByDate[recordingDate].recordings.push({
+          ...recording,
+          notes: notes,
+          uploadedBy: recipient.name,
+          isOrphaned: true, // Flag to indicate this recording has no shift
+        });
+      }
+
+      // Auto-generate containers for today and yesterday if they don't exist
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      const todayString = formatDateToString(today);
+      const yesterdayString = formatDateToString(yesterday);
+
+      // Add today if it doesn't exist
+      if (!groupedByDate[todayString]) {
+        groupedByDate[todayString] = {
+          date: todayString,
+          displayDate: 'Today',
+          shifts: [],
+          recordings: [],
+        };
+      }
+
+      // Add yesterday if it doesn't exist
+      if (!groupedByDate[yesterdayString]) {
+        groupedByDate[yesterdayString] = {
+          date: yesterdayString,
+          displayDate: 'Yesterday',
+          shifts: [],
+          recordings: [],
+        };
+      }
+
+      // Convert to array and filter out future dates (beyond today)
+      const todayDate = new Date(todayString);
+      const dailyDataArray = Object.values(groupedByDate)
+        .filter(day => {
+          const dayDate = new Date(day.date);
+          // Only keep dates that are today or in the past
+          return dayDate <= todayDate;
+        })
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
 
       setDailyData(dailyDataArray);
     } catch (err) {
       console.error('Error fetching data:', err);
       setError('Failed to load data. Please check if the backend server is running.');
-      Alert.alert('Error', 'Failed to load care recipient data. Please try again.');
+      if (!isRefreshing) {
+        Alert.alert('Error', 'Failed to load care recipient data. Please try again.');
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  // Handle pull-to-refresh
+  const onRefresh = () => {
+    fetchShiftsAndRecordings(true);
+  };
+
+  // Helper function to format date as YYYY-MM-DD
+  const formatDateToString = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const formatDisplayDate = (dateString) => {
@@ -187,7 +275,7 @@ export default function CareRecipientDetail({ route, navigation }) {
     setDailyData(updatedData);
   };
 
-  const handleAddShift = () => {
+  const handleAddShift = async () => {
     if (!newShiftDate || !newShiftStartTime || !newShiftEndTime || !newShiftNotes.trim() || !newShiftCaregiverName.trim()) {
       Alert.alert('Missing Information', 'Please fill in all fields');
       return;
@@ -215,48 +303,34 @@ export default function CareRecipientDetail({ route, navigation }) {
       return;
     }
 
-    // Find or create day group
-    const updatedData = [...dailyData];
-    let dayIndex = updatedData.findIndex(d => d.date === newShiftDate);
-
-    const newShift = {
-      id: `shift-${Date.now()}`,
-      shiftNumber: 1,
-      caregiverName: newShiftCaregiverName,
-      startTime: newShiftStartTime,
-      endTime: newShiftEndTime,
-      time: `${newShiftStartTime} - ${newShiftEndTime}`,
-      notes: newShiftNotes,
-      expanded: false,
-    };
-
-    if (dayIndex >= 0) {
-      // Day exists, add shift
-      newShift.shiftNumber = updatedData[dayIndex].shifts.length + 1;
-      updatedData[dayIndex].shifts.push(newShift);
-    } else {
-      // Create new day
-      updatedData.unshift({
+    try {
+      // Create shift in backend
+      const shiftData = {
+        care_recipient_id: recipient.id,
         date: newShiftDate,
-        displayDate: formatDisplayDate(newShiftDate),
-        shifts: [newShift],
-        recordings: [],
-      });
+        notes: `${newShiftStartTime} - ${newShiftEndTime}\n\n${newShiftNotes}`,
+        caregiver_id: caregiver?.id || 'CG001',
+        caregiver_name: newShiftCaregiverName,
+      };
+
+      await api.createShift(shiftData);
+
+      // Reset form
+      setNewShiftDate('');
+      setNewShiftStartTime('');
+      setNewShiftEndTime('');
+      setNewShiftNotes('');
+      setNewShiftCaregiverName('');
+      setShowAddShiftModal(false);
+
+      // Refresh data
+      await fetchShiftsAndRecordings();
+
+      Alert.alert('Success', 'Shift added successfully!');
+    } catch (error) {
+      console.error('Error creating shift:', error);
+      Alert.alert('Error', 'Failed to create shift. Please try again.');
     }
-
-    // Sort by date
-    updatedData.sort((a, b) => new Date(b.date) - new Date(a.date));
-    setDailyData(updatedData);
-
-    // Reset form
-    setNewShiftDate('');
-    setNewShiftStartTime('');
-    setNewShiftEndTime('');
-    setNewShiftNotes('');
-    setNewShiftCaregiverName('');
-    setShowAddShiftModal(false);
-
-    Alert.alert('Success', 'Shift added successfully!');
   };
 
   const handleRecordingPress = (recording, day) => {
@@ -267,6 +341,35 @@ export default function CareRecipientDetail({ route, navigation }) {
       recipient,
       caregiver,
     });
+  };
+
+  const handleAiAnalysis = async (day) => {
+    // Check if there are any shifts for this day
+    if (!day.shifts || day.shifts.length === 0) {
+      Alert.alert('No Shifts Available', 'There are no shifts recorded for this day to analyze.');
+      return;
+    }
+
+    setSelectedDayForAnalysis(day);
+    setShowAiAnalysisModal(true);
+    setAiAnalysisLoading(true);
+    setAiAnalysisData(null);
+
+    try {
+      // Use the first shift of the day for analysis
+      const shiftId = day.shifts[0].id;
+      const analysis = await api.analyzeShift(shiftId);
+      setAiAnalysisData(analysis);
+    } catch (error) {
+      console.error('Error analyzing shift:', error);
+      setAiAnalysisData({
+        error: 'Failed to analyze shift notes. Please make sure the AI service is configured.',
+        summary: '',
+        suggestions: [],
+      });
+    } finally {
+      setAiAnalysisLoading(false);
+    }
   };
 
   const handleShiftPress = (shift, date) => {
@@ -324,6 +427,14 @@ export default function CareRecipientDetail({ route, navigation }) {
       <ScrollView
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[Colors.primary]}
+            tintColor={Colors.primary}
+          />
+        }
       >
         {loading ? (
           <View style={styles.loadingContainer}>
@@ -355,56 +466,65 @@ export default function CareRecipientDetail({ route, navigation }) {
 
             {/* Shifts */}
             <View style={styles.shiftsContainer}>
-              {day.shifts.map((shift, shiftIndex) => (
-                <TouchableOpacity
-                  key={shiftIndex}
-                  style={styles.shiftBox}
-                  onPress={() => toggleShiftExpansion(dayIndex, shiftIndex)}
-                  activeOpacity={0.7}
-                >
-                  {/* Shift Summary - Always Visible */}
-                  <View style={styles.shiftSummaryContainer}>
-                    <View style={styles.shiftHeader}>
-                      <View style={styles.caregiverInfoContainer}>
-                        <View style={styles.caregiverAvatar}>
-                          <Text style={styles.caregiverAvatarText}>
-                            {shift.caregiverName ? shift.caregiverName.split(' ').map(n => n[0]).join('') : 'S' + shift.shiftNumber}
-                          </Text>
+              {day.shifts.length > 0 ? (
+                day.shifts.map((shift, shiftIndex) => (
+                  <TouchableOpacity
+                    key={shiftIndex}
+                    style={styles.shiftBox}
+                    onPress={() => toggleShiftExpansion(dayIndex, shiftIndex)}
+                    activeOpacity={0.7}
+                  >
+                    {/* Shift Summary - Always Visible */}
+                    <View style={styles.shiftSummaryContainer}>
+                      <View style={styles.shiftHeader}>
+                        <View style={styles.caregiverInfoContainer}>
+                          <View style={styles.caregiverAvatar}>
+                            <Text style={styles.caregiverAvatarText}>
+                              {shift.caregiverName ? shift.caregiverName.split(' ').map(n => n[0]).join('') : 'S' + shift.shiftNumber}
+                            </Text>
+                          </View>
+                          <View style={styles.shiftMainInfo}>
+                            <Text style={styles.shiftCaregiver}>
+                              {shift.caregiverName || `Shift ${shift.shiftNumber}`}
+                            </Text>
+                            {shift.time && (
+                              <Text style={styles.shiftTime}>
+                                {shift.time}
+                              </Text>
+                            )}
+                          </View>
                         </View>
-                        <View style={styles.shiftMainInfo}>
-                          <Text style={styles.shiftCaregiver}>
-                            {shift.caregiverName || `Shift ${shift.shiftNumber}`}
-                          </Text>
-                          <Text style={styles.shiftTime}>
-                            {shift.time || shift.startTime && shift.endTime ? `${shift.startTime} - ${shift.endTime}` : `Shift ${shift.shiftNumber}`}
+                        <View style={styles.shiftBadge}>
+                          <Text style={styles.shiftBadgeText}>
+                            Shift {shift.shiftNumber}
                           </Text>
                         </View>
                       </View>
-                      <View style={styles.shiftBadge}>
-                        <Text style={styles.shiftBadgeText}>
-                          Shift {shift.shiftNumber}
-                        </Text>
-                      </View>
-                    </View>
 
-                    {/* Expand Indicator */}
-                    <Text style={styles.expandIndicator}>
-                      {shift.expanded ? '▼ Tap to collapse' : '▶ Tap for details'}
-                    </Text>
-                  </View>
-
-                  {/* Expanded Notes */}
-                  {shift.expanded && (
-                    <View style={styles.shiftDetails}>
-                      <View style={styles.divider} />
-                      <Text style={styles.notesLabel}>Shift Notes:</Text>
-                      <Text style={styles.notesText}>
-                        {shift.notes || 'No notes available for this shift. Tap "+" to add notes.'}
+                      {/* Expand Indicator */}
+                      <Text style={styles.expandIndicator}>
+                        {shift.expanded ? '▼ Tap to collapse' : '▶ Tap for details'}
                       </Text>
                     </View>
-                  )}
-                </TouchableOpacity>
-              ))}
+
+                    {/* Expanded Notes */}
+                    {shift.expanded && (
+                      <View style={styles.shiftDetails}>
+                        <View style={styles.divider} />
+                        <Text style={styles.notesLabel}>Shift Notes:</Text>
+                        <Text style={styles.notesText}>
+                          {shift.notes || 'No notes available for this shift. Tap "+" to add notes.'}
+                        </Text>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View style={styles.noShiftsBox}>
+                  <Text style={styles.noShiftsText}>No shifts recorded yet</Text>
+                  <Text style={styles.noShiftsSubtext}>Tap the "+" button to add a shift</Text>
+                </View>
+              )}
             </View>
 
             {/* Recordings */}
@@ -449,6 +569,18 @@ export default function CareRecipientDetail({ route, navigation }) {
                 <Text style={styles.noRecordingsText}>No recordings for this day</Text>
               </View>
             )}
+
+            {/* AI Analysis Button */}
+            {day.shifts.length > 0 && (
+              <TouchableOpacity
+                style={styles.aiAnalysisButton}
+                onPress={() => handleAiAnalysis(day)}
+                activeOpacity={0.7}
+              >
+                <Bot color={Colors.gray700} style={{marginRight: 5}} />
+                <Text style={styles.aiAnalysisButtonText}>AI Analysis & Suggestions</Text>
+              </TouchableOpacity>
+            )}
           </View>
           ))
         )}
@@ -474,11 +606,11 @@ export default function CareRecipientDetail({ route, navigation }) {
         transparent={true}
         onRequestClose={() => setShowAddShiftModal(false)}
       >
-        <KeyboardAvoidingView
-          style={styles.modalContainer}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        >
-          <View style={styles.modalContent}>
+        <View style={styles.modalContainer}>
+          <KeyboardAvoidingView
+            style={styles.modalContent}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          >
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Add New Shift</Text>
               <TouchableOpacity onPress={() => setShowAddShiftModal(false)}>
@@ -542,8 +674,82 @@ export default function CareRecipientDetail({ route, navigation }) {
                 <Text style={styles.submitButtonText}>Add Shift</Text>
               </TouchableOpacity>
             </ScrollView>
+          </KeyboardAvoidingView>
+        </View>
+      </Modal>
+
+      {/* AI Analysis Modal */}
+      <Modal
+        visible={showAiAnalysisModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAiAnalysisModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.aiModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>AI Analysis</Text>
+              <TouchableOpacity onPress={() => setShowAiAnalysisModal(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {aiAnalysisLoading ? (
+                <View style={styles.aiLoadingContainer}>
+                  <ActivityIndicator size="large" color={Colors.primary} />
+                  <Text style={styles.aiLoadingText}>Analyzing shift notes...</Text>
+                </View>
+              ) : aiAnalysisData ? (
+                <View>
+                  {aiAnalysisData.error ? (
+                    <View style={styles.aiErrorContainer}>
+                      <Text style={styles.aiErrorText}>{aiAnalysisData.error}</Text>
+                    </View>
+                  ) : (
+                    <>
+                      {/* Summary Section */}
+                      {aiAnalysisData.summary && (
+                        <View style={styles.aiSectionContainer}>
+                          <Text style={styles.aiSectionTitle}>Summary</Text>
+                          <View style={styles.aiContentBox}>
+                            <Text style={styles.aiSummaryText}>{aiAnalysisData.summary}</Text>
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Suggestions Section */}
+                      {aiAnalysisData.suggestions && aiAnalysisData.suggestions.length > 0 && (
+                        <View style={styles.aiSectionContainer}>
+                          <Text style={styles.aiSectionTitle}>Suggestions for Next Shift</Text>
+                          {aiAnalysisData.suggestions.map((suggestion, index) => (
+                            <View key={index} style={styles.aiSuggestionBox}>
+                              <Text style={styles.aiSuggestionNumber}>{index + 1}</Text>
+                              <Text style={styles.aiSuggestionText}>{suggestion}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                      {/* Priorities Section */}
+                      {aiAnalysisData.priorities && aiAnalysisData.priorities.length > 0 && (
+                        <View style={styles.aiSectionContainer}>
+                          <Text style={styles.aiSectionTitle}>Priority Items</Text>
+                          {aiAnalysisData.priorities.map((priority, index) => (
+                            <View key={index} style={styles.aiPriorityBox}>
+                              <Text style={styles.aiPriorityIcon}>⚠️</Text>
+                              <Text style={styles.aiPriorityText}>{priority}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </>
+                  )}
+                </View>
+              ) : null}
+            </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
     </View>
   );
@@ -807,6 +1013,26 @@ const styles = StyleSheet.create({
     color: Colors.gray500,
     fontStyle: 'italic',
   },
+  noShiftsBox: {
+    backgroundColor: Colors.gray50,
+    padding: 24,
+    borderRadius: BorderRadius.md,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.gray300,
+    borderStyle: 'dashed',
+  },
+  noShiftsText: {
+    fontSize: 15,
+    color: Colors.gray600,
+    fontWeight: '600',
+    marginBottom: 6,
+  },
+  noShiftsSubtext: {
+    fontSize: 13,
+    color: Colors.gray500,
+    fontStyle: 'italic',
+  },
   loadingContainer: {
     ...ContainerStyles.centered,
     paddingVertical: 60,
@@ -924,8 +1150,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderTopLeftRadius: BorderRadius.xl,
     borderTopRightRadius: BorderRadius.xl,
-    padding: 24,
-    maxHeight: '85%',
+    paddingTop: 24,
+    paddingHorizontal: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    maxHeight: '90%',
+    minHeight: '50%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -975,4 +1204,128 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  aiAnalysisButton: {
+    backgroundColor: Colors.gray50,
+    borderRadius: BorderRadius.md,
+    padding: 16,
+    marginTop: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.gray300,
+  },
+  aiAnalysisIcon: {
+    fontSize: 20,
+    marginRight: 8,
+  },
+  aiAnalysisButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.gray700,
+  },
+  aiModalContent: {
+    backgroundColor: Colors.white,
+    borderTopLeftRadius: BorderRadius.xl,
+    borderTopRightRadius: BorderRadius.xl,
+    paddingTop: 24,
+    paddingHorizontal: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    maxHeight: '85%',
+    minHeight: '60%',
+  },
+  aiLoadingContainer: {
+    paddingVertical: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  aiLoadingText: {
+    fontSize: 15,
+    color: Colors.gray600,
+    marginTop: 16,
+  },
+  aiErrorContainer: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: BorderRadius.md,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#fcc',
+  },
+  aiErrorText: {
+    fontSize: 14,
+    color: '#c00',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  aiSectionContainer: {
+    marginBottom: 24,
+  },
+  aiSectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: Colors.text,
+    marginBottom: 12,
+  },
+  aiContentBox: {
+    backgroundColor: Colors.gray50,
+    borderRadius: BorderRadius.md,
+    padding: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: Colors.primary,
+  },
+  aiSummaryText: {
+    fontSize: 15,
+    color: Colors.text,
+    lineHeight: 22,
+  },
+  aiSuggestionBox: {
+    backgroundColor: '#f0f4ff',
+    borderRadius: BorderRadius.md,
+    padding: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#d0dcff',
+  },
+  aiSuggestionNumber: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: Colors.primary,
+    backgroundColor: Colors.white,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginRight: 12,
+  },
+  aiSuggestionText: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 20,
+  },
+  aiPriorityBox: {
+    backgroundColor: '#fff5f0',
+    borderRadius: BorderRadius.md,
+    padding: 14,
+    marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#ffe0d0',
+  },
+  aiPriorityIcon: {
+    fontSize: 18,
+    marginRight: 10,
+  },
+  aiPriorityText: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.text,
+    lineHeight: 20,
+    fontWeight: '500',
+  },
 });
+

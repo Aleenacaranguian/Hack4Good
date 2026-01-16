@@ -4,7 +4,7 @@
 // For iOS Simulator: use localhost or 127.0.0.1
 // For Android Emulator: use 10.0.2.2
 // For Physical Device: use your computer's local IP (e.g., 192.168.1.x)
-const API_BASE_URL = 'http:///{change me!}:5000';
+const API_BASE_URL = 'http:/10.211.225.128:5000';
 
 class ApiService {
   /**
@@ -76,14 +76,30 @@ class ApiService {
    * Get all recordings
    */
   async getRecordings() {
-    return this.request('/recordings');
+    const recordings = await this.request('/recordings');
+
+    // Map snake_case to camelCase for consistency
+    return recordings.map(recording => ({
+      ...recording,
+      shiftId: recording.shift_id,
+      careRecipientId: recording.care_recipient_id,
+      audioUrl: recording.audio_url,
+    }));
   }
 
   /**
    * Get a specific recording with its notes
    */
   async getRecording(recordingId) {
-    return this.request(`/recordings/${recordingId}`);
+    const recording = await this.request(`/recordings/${recordingId}`);
+
+    // Map snake_case to camelCase for consistency
+    return {
+      ...recording,
+      shiftId: recording.shift_id,
+      careRecipientId: recording.care_recipient_id,
+      audioUrl: recording.audio_url,
+    };
   }
 
   /**
@@ -112,7 +128,15 @@ class ApiService {
    */
   async getShifts(careRecipientId = null) {
     const query = careRecipientId ? `?care_recipient_id=${careRecipientId}` : '';
-    return this.request(`/shifts${query}`);
+    const shifts = await this.request(`/shifts${query}`);
+
+    // Map snake_case to camelCase for consistency
+    return shifts.map(shift => ({
+      ...shift,
+      shiftNumber: shift.shift_number,
+      careRecipientId: shift.care_recipient_id,
+      // Keep original properties for backward compatibility
+    }));
   }
 
   /**
@@ -122,6 +146,23 @@ class ApiService {
     return this.request(`/shifts/${shiftId}`);
   }
 
+  /**
+   * Create a new shift
+   */
+  async createShift(shiftData) {
+    const shift = await this.request('/shifts', {
+      method: 'POST',
+      body: JSON.stringify(shiftData),
+    });
+
+    // Map snake_case to camelCase for consistency
+    return {
+      ...shift,
+      shiftNumber: shift.shift_number,
+      careRecipientId: shift.care_recipient_id,
+    };
+  }
+
   // ============= SHIFT NOTES API =============
 
   /**
@@ -129,6 +170,15 @@ class ApiService {
    */
   async getShiftNotes(shiftId) {
     return this.request(`/shifts/${shiftId}/notes`);
+  }
+
+  /**
+   * Analyze shift notes using AI
+   */
+  async analyzeShift(shiftId) {
+    return this.request(`/shifts/${shiftId}/analyze`, {
+      method: 'POST',
+    });
   }
 
   /**

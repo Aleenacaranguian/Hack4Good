@@ -143,9 +143,6 @@ export default function RecordingDetail({ route }) {
       <ScrollView style={styles.scrollContainer}>
         <View style={styles.header}>
           <Text style={styles.recipientName}>{recipient.name}</Text>
-          <Text style={styles.recordingInfo}>
-            Shift {shift.shiftNumber} - Day {shift.day}
-          </Text>
           <Text style={styles.timestamp}>
             {formatTime(recording.timestamp)}
           </Text>

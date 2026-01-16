@@ -11,6 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { Audio } from 'expo-av';
+import api from '../services/api';
 
 export default function CareRecipientHome({ route, navigation }) {
   const { user } = route.params;
@@ -193,61 +194,60 @@ export default function CareRecipientHome({ route, navigation }) {
     }
   };
 
-  const handleUpload = () => {
-    if (excludedCaregivers.length > 0) {
-      const excluded = caregivers
-        .filter(c => excludedCaregivers.includes(c.id))
-        .map(c => c.name)
-        .join(', ');
+  const handleUpload = async () => {
+    try {
+      // Get today's date
+      const today = new Date();
+      const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-      Alert.alert(
-        'Upload Recording',
-        `Recording will be visible to all caregivers except: ${excluded}`,
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Upload',
-            onPress: async () => {
-              // Here you would upload to cloud storage with privacy settings
-              // Include excludedCaregivers array in the upload
-              Alert.alert('Success', 'Recording uploaded successfully!');
-              
-              // Clean up
-              if (sound) {
-                await sound.unloadAsync();
-                setSound(null);
-              }
-              setHasRecording(false);
-              setRecordingUri(null);
-              setRecordingDuration(0);
-              setExcludedCaregivers([]);
-            }
-          },
-        ]
-      );
-    } else {
-      Alert.alert(
-        'Upload Recording',
-        'Recording will be visible to all caregivers',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Upload',
-            onPress: async () => {
-              // Upload logic here
-              Alert.alert('Success', 'Recording uploaded successfully!');
-              
-              if (sound) {
-                await sound.unloadAsync();
-                setSound(null);
-              }
-              setHasRecording(false);
-              setRecordingUri(null);
-              setRecordingDuration(0);
-            }
-          },
-        ]
-      );
+      // Fetch existing shifts for this care recipient
+      const shifts = await api.getShifts(user.id);
+
+      // Find today's shift (optional - recording can exist without a shift)
+      let todayShift = shifts.find(s => s.date === todayString);
+      const shiftId = todayShift ? todayShift.id : null;
+
+      if (!todayShift) {
+        console.log(`[CareRecipientHome] No shift found for today. Recording will be unassociated until caregiver creates a shift.`);
+      } else {
+        console.log(`[CareRecipientHome] Using existing shift: ${shiftId}`);
+      }
+
+      // Create the recording in the backend (shift_id can be null)
+      const recordingData = {
+        shift_id: shiftId, // Can be null - will be associated with shift later
+        care_recipient_id: user.id,
+        duration: recordingDuration,
+        audio_url: recordingUri, // In production, upload to cloud storage first
+        excluded_caregivers: excludedCaregivers, // Optional: for privacy settings
+      };
+
+      console.log('[CareRecipientHome] Creating recording:', recordingData);
+      const createdRecording = await api.createRecording(recordingData);
+      console.log('[CareRecipientHome] Recording created:', createdRecording);
+
+      let message = 'Recording uploaded successfully!';
+      if (!todayShift) {
+        message += ' Your caregiver will be able to see it once they document today\'s shift.';
+      }
+      if (excludedCaregivers.length > 0) {
+        message += ` Excluded: ${caregivers.filter(c => excludedCaregivers.includes(c.id)).map(c => c.name).join(', ')}`;
+      }
+
+      Alert.alert('Success', message);
+
+      // Clean up
+      if (sound) {
+        await sound.unloadAsync();
+        setSound(null);
+      }
+      setHasRecording(false);
+      setRecordingUri(null);
+      setRecordingDuration(0);
+      setExcludedCaregivers([]);
+    } catch (error) {
+      console.error('[CareRecipientHome] Upload failed:', error);
+      Alert.alert('Error', 'Failed to upload recording. Please try again.');
     }
   };
 

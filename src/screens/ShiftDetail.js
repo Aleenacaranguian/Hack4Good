@@ -155,7 +155,7 @@ export default function ShiftDetail({ route, navigation }) {
     >
       <View style={styles.header}>
         <Text style={styles.shiftTitle}>
-          Shift {shift.shiftNumber} - Day {shift.day}
+          {shift.shiftNumber ? `Shift ${shift.shiftNumber}` : 'Shift Details'}
         </Text>
         <Text style={styles.recipientName}>{recipient.name}</Text>
         <Text style={styles.dateText}>
