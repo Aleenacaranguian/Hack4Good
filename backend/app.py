@@ -69,12 +69,11 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS recordings (
             id TEXT PRIMARY KEY,
-            shift_id TEXT,
+            date TEXT,
             care_recipient_id TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             duration INTEGER,
             audio_url TEXT,
-            FOREIGN KEY (shift_id) REFERENCES shifts(id),
             FOREIGN KEY (care_recipient_id) REFERENCES care_recipients(id)
         )
     ''')
@@ -264,10 +263,17 @@ def delete_note(note_id):
 
 @app.route('/recordings', methods=['GET'])
 def get_recordings():
-    """Get all recordings"""
+    """Get all recordings, optionally filtered by care_recipient_id"""
+    care_recipient_id = request.args.get('care_recipient_id')
+
     conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM recordings ORDER BY timestamp DESC')
+
+    if care_recipient_id:
+        cursor.execute('SELECT * FROM recordings WHERE care_recipient_id = ? ORDER BY timestamp DESC', (care_recipient_id,))
+    else:
+        cursor.execute('SELECT * FROM recordings ORDER BY timestamp DESC')
+
     recordings = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return jsonify(recordings)
@@ -283,18 +289,19 @@ def create_recording():
         print("ERROR: Missing required field: care_recipient_id")
         return jsonify({'error': 'care_recipient_id is required'}), 400
 
-    # shift_id is now optional - recording can exist without a shift
     recording_id = f"R{int(datetime.now().timestamp() * 1000)}"
     timestamp = datetime.now().isoformat()
+    # Use provided date or extract date from timestamp
+    recording_date = data.get('date') or timestamp.split('T')[0]
 
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO recordings (id, shift_id, care_recipient_id, timestamp, duration, audio_url)
+        INSERT INTO recordings (id, date, care_recipient_id, timestamp, duration, audio_url)
         VALUES (?, ?, ?, ?, ?, ?)
     ''', (
         recording_id,
-        data.get('shift_id'),
+        recording_date,
         data.get('care_recipient_id'),
         timestamp,
         data.get('duration', 0),
@@ -426,7 +433,9 @@ def get_shifts():
 
     # Get recordings and shift notes for each shift
     for shift in shifts:
-        cursor.execute('SELECT * FROM recordings WHERE shift_id = ?', (shift['id'],))
+        # Get recordings by matching date and care_recipient_id
+        cursor.execute('SELECT * FROM recordings WHERE date = ? AND care_recipient_id = ?',
+                      (shift['date'], shift['care_recipient_id']))
         shift['recordings'] = [dict(row) for row in cursor.fetchall()]
 
         cursor.execute('SELECT * FROM shift_notes WHERE shift_id = ? ORDER BY timestamp DESC', (shift['id'],))

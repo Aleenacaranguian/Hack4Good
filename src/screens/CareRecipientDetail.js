@@ -75,7 +75,7 @@ export default function CareRecipientDetail({ route, navigation }) {
       // Fetch shifts for this care recipient
       const shifts = await api.getShifts(recipient.id);
 
-      // Fetch ALL recordings for this care recipient (including orphaned ones)
+      // Fetch ALL recordings for this care recipient
       const allRecordings = await api.getRecordings(recipient.id);
 
       // Group data by date
@@ -123,31 +123,12 @@ export default function CareRecipientDetail({ route, navigation }) {
           notes: shiftNotes || `No notes available for this shift`,
           day: shift.day,
         });
-
-        // Add recordings for this shift and fetch their note counts
-        if (shift.recordings && shift.recordings.length > 0) {
-          for (const recording of shift.recordings) {
-            // Fetch notes for each recording to get the count
-            const notes = await api.getNotes(recording.id);
-
-            groupedByDate[shiftDate].recordings.push({
-              ...recording,
-              notes: notes,
-              uploadedBy: recipient.name,
-            });
-          }
-        }
       }
 
-      // Process orphaned recordings (recordings without shifts)
+      // Process all recordings and group by date
       for (const recording of allRecordings) {
-        // Skip if this recording already belongs to a shift
-        if (recording.shiftId || recording.shift_id) {
-          continue;
-        }
-
-        // Extract date from recording timestamp
-        const recordingDate = recording.timestamp.split('T')[0];
+        // Use recording.date if available, otherwise extract from timestamp
+        const recordingDate = recording.date || recording.timestamp.split('T')[0];
 
         if (!groupedByDate[recordingDate]) {
           groupedByDate[recordingDate] = {
@@ -161,12 +142,11 @@ export default function CareRecipientDetail({ route, navigation }) {
         // Fetch notes for the recording
         const notes = await api.getNotes(recording.id);
 
-        // Add orphaned recording to the appropriate date
+        // Add recording to the appropriate date
         groupedByDate[recordingDate].recordings.push({
           ...recording,
           notes: notes,
           uploadedBy: recipient.name,
-          isOrphaned: true, // Flag to indicate this recording has no shift
         });
       }
 

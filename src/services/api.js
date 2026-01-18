@@ -4,7 +4,7 @@
 // For iOS Simulator: use localhost or 127.0.0.1
 // For Android Emulator: use 10.0.2.2
 // For Physical Device: use your computer's local IP (e.g., 192.168.1.x)
-const API_BASE_URL = 'http://change-me:5000';
+const API_BASE_URL = ' http://172.20.10.4:5000';
 
 class ApiService {
   /**
@@ -73,10 +73,11 @@ class ApiService {
   // ============= RECORDINGS API =============
 
   /**
-   * Get all recordings
+   * Get all recordings, optionally filtered by care recipient
    */
-  async getRecordings() {
-    return this.request('/recordings');
+  async getRecordings(careRecipientId = null) {
+    const query = careRecipientId ? `?care_recipient_id=${careRecipientId}` : '';
+    return this.request(`/recordings${query}`);
   }
 
   /**
@@ -120,6 +121,16 @@ class ApiService {
    */
   async getShift(shiftId) {
     return this.request(`/shifts/${shiftId}`);
+  }
+
+  /**
+   * Create a new shift
+   */
+  async createShift(shiftData) {
+    return this.request('/shifts', {
+      method: 'POST',
+      body: JSON.stringify(shiftData),
+    });
   }
 
   // ============= SHIFT NOTES API =============

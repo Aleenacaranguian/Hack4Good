@@ -58,12 +58,11 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS recordings (
             id TEXT PRIMARY KEY,
-            shift_id TEXT NOT NULL,
+            date TEXT,
             care_recipient_id TEXT NOT NULL,
             timestamp TEXT NOT NULL,
             duration INTEGER,
             audio_url TEXT,
-            FOREIGN KEY (shift_id) REFERENCES shifts(id),
             FOREIGN KEY (care_recipient_id) REFERENCES care_recipients(id)
         )
     ''')
@@ -149,17 +148,17 @@ def seed_database():
     ]
     cursor.executemany('INSERT INTO shifts VALUES (?, ?, ?, ?, ?)', shifts)
 
-    # Seed recordings
+    # Seed recordings (linked by date instead of shift_id)
     print("Seeding recordings...")
     recordings = [
-        ('R001', 'S001', 'CR001', '2026-01-13T08:30:00', 45, None),
-        ('R002', 'S001', 'CR001', '2026-01-13T12:15:00', 30, None),
-        ('R003', 'S001', 'CR001', '2026-01-13T15:45:00', 60, None),
-        ('R004', 'S002', 'CR001', '2026-01-14T08:30:00', 50, None),
-        ('R005', 'S002', 'CR001', '2026-01-14T14:20:00', 40, None),
-        ('R006', 'S003', 'CR002', '2026-01-13T09:00:00', 35, None),
-        ('R007', 'S004', 'CR003', '2026-01-13T10:00:00', 55, None),
-        ('R008', 'S004', 'CR003', '2026-01-13T13:30:00', 42, None),
+        ('R001', '2026-01-13', 'CR001', '2026-01-13T08:30:00', 45, None),
+        ('R002', '2026-01-13', 'CR001', '2026-01-13T12:15:00', 30, None),
+        ('R003', '2026-01-13', 'CR001', '2026-01-13T15:45:00', 60, None),
+        ('R004', '2026-01-14', 'CR001', '2026-01-14T08:30:00', 50, None),
+        ('R005', '2026-01-14', 'CR001', '2026-01-14T14:20:00', 40, None),
+        ('R006', '2026-01-13', 'CR002', '2026-01-13T09:00:00', 35, None),
+        ('R007', '2026-01-13', 'CR003', '2026-01-13T10:00:00', 55, None),
+        ('R008', '2026-01-13', 'CR003', '2026-01-13T13:30:00', 42, None),
     ]
     cursor.executemany('INSERT INTO recordings VALUES (?, ?, ?, ?, ?, ?)', recordings)
 
