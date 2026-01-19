@@ -53,14 +53,14 @@ export default function CareRecipientDetail({ route, navigation }) {
   // Fetch shifts and recordings from backend
   useEffect(() => {
     fetchShiftsAndRecordings();
-  }, [recipient.id]);
+  }, [recipient.id, caregiver?.id]);
 
   // Auto-refresh when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       console.log('[CareRecipientDetail] Screen focused, refreshing data...');
       fetchShiftsAndRecordings();
-    }, [recipient.id])
+    }, [recipient.id, caregiver?.id])
   );
 
   const fetchShiftsAndRecordings = async (isRefreshing = false) => {
@@ -75,13 +75,23 @@ export default function CareRecipientDetail({ route, navigation }) {
       // Fetch shifts for this care recipient
       const shifts = await api.getShifts(recipient.id);
 
-      // Fetch ALL recordings for this care recipient
-      const allRecordings = await api.getRecordings(recipient.id);
+      // Fetch recordings for this care recipient
+      // If a caregiver is viewing, filter to only show recordings they have access to
+      const allRecordings = caregiver?.id
+        ? await api.getAccessibleRecordings(recipient.id, caregiver.id)
+        : await api.getRecordings(recipient.id);
 
       // Group data by date
       const groupedByDate = {};
 
       // First, process existing shifts from the backend
+      // Fetch all caregivers to map IDs to names
+      const allCaregivers = await api.getCaregivers();
+      const caregiverMap = {};
+      for (const cg of allCaregivers) {
+        caregiverMap[cg.id] = cg.name;
+      }
+
       for (const shift of shifts) {
         const shiftDate = shift.date;
 
@@ -94,41 +104,34 @@ export default function CareRecipientDetail({ route, navigation }) {
           };
         }
 
-        // Extract time and notes from shift notes
+        // Build time string from start_time and end_time
         let shiftTime = '';
-        let shiftNotes = '';
-
-        if (shift.notes) {
-          // Check if notes contain time format (HH:MM - HH:MM)
-          const timePattern = /(\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2})/;
-          const match = shift.notes.match(timePattern);
-
-          if (match) {
-            shiftTime = match[1];
-            // Remove the time from notes, leaving only the actual notes
-            shiftNotes = shift.notes.replace(timePattern, '').trim();
-            // Remove leading newlines
-            shiftNotes = shiftNotes.replace(/^\n+/, '');
-          } else {
-            shiftNotes = shift.notes;
-          }
+        if (shift.start_time && shift.end_time) {
+          shiftTime = `${shift.start_time} - ${shift.end_time}`;
         }
 
-        // Add shift info
+        // Get caregiver name from the map
+        const caregiverName = caregiverMap[shift.care_giver_id] || `Shift ${shift.shift_no}`;
+
+        // Add shift info - use uuid as the id
         groupedByDate[shiftDate].shifts.push({
-          id: shift.id,
-          shiftNumber: shift.shiftNumber || shift.shift_number,
-          caregiverName: shift.caregiverName || `Shift ${shift.shift_number}`,
-          time: shiftTime || shift.time || '',
-          notes: shiftNotes || `No notes available for this shift`,
-          day: shift.day,
+          id: shift.uuid, // Use uuid from Supabase
+          uuid: shift.uuid,
+          shiftNumber: shift.shift_no,
+          caregiverName: caregiverName,
+          caregiverId: shift.care_giver_id,
+          time: shiftTime,
+          notes: shift.content || `No notes available for this shift`,
+          day: shift.shift_no,
         });
       }
 
       // Process all recordings and group by date
       for (const recording of allRecordings) {
-        // Use recording.date if available, otherwise extract from timestamp
-        const recordingDate = recording.date || recording.timestamp.split('T')[0];
+        // Use recording.date if available, otherwise extract from created_at
+        const recordingDate = recording.date || recording.created_at?.split('T')[0];
+
+        if (!recordingDate) continue; // Skip if no date available
 
         if (!groupedByDate[recordingDate]) {
           groupedByDate[recordingDate] = {
@@ -139,12 +142,14 @@ export default function CareRecipientDetail({ route, navigation }) {
           };
         }
 
-        // Fetch notes for the recording
-        const notes = await api.getNotes(recording.id);
+        // Fetch notes for the recording using uuid
+        const notes = await api.getNotes(recording.uuid);
 
         // Add recording to the appropriate date
         groupedByDate[recordingDate].recordings.push({
           ...recording,
+          id: recording.uuid, // Use uuid as id for compatibility
+          timestamp: recording.created_at, // Map created_at to timestamp
           notes: notes,
           uploadedBy: recipient.name,
         });
@@ -284,13 +289,21 @@ export default function CareRecipientDetail({ route, navigation }) {
     }
 
     try {
-      // Create shift in backend
+      // Calculate the next shift number for this date
+      // Find the day in dailyData that matches the newShiftDate
+      const existingDay = dailyData.find(day => day.date === newShiftDate);
+      const existingShiftsOnDate = existingDay ? existingDay.shifts.length : 0;
+      const nextShiftNo = existingShiftsOnDate + 1;
+
+      // Create shift in Supabase with new schema
       const shiftData = {
         care_recipient_id: recipient.id,
+        care_giver_id: caregiver.id,
         date: newShiftDate,
-        notes: `${newShiftStartTime} - ${newShiftEndTime}\n\n${newShiftNotes}`,
-        caregiver_id: caregiver?.id || 'CG001',
-        caregiver_name: newShiftCaregiverName,
+        start_time: newShiftStartTime,
+        end_time: newShiftEndTime,
+        content: newShiftNotes,
+        shift_no: nextShiftNo,
       };
 
       await api.createShift(shiftData);
@@ -350,20 +363,6 @@ export default function CareRecipientDetail({ route, navigation }) {
     } finally {
       setAiAnalysisLoading(false);
     }
-  };
-
-  const handleShiftPress = (shift, date) => {
-    navigation.navigate('ShiftDetail', {
-      shift: {
-        id: shift.id || `${recipient.id}-${date}-${shift.shiftNumber}`,
-        shift_number: shift.shiftNumber,
-        shiftNumber: shift.shiftNumber,
-        date: date,
-        day: shift.day || 1,
-      },
-      recipient,
-      caregiver,
-    });
   };
 
   const handleViewProfile = () => {
