@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import api from '../services/api';
+import gemini from '../services/gemini'
 import { Colors, TextStyles, ButtonStyles, ContainerStyles, Shadows, BorderRadius, InputStyles } from '../styles/CommonStyles';
 import { Bot } from 'lucide-react-native';
 
@@ -351,7 +352,7 @@ export default function CareRecipientDetail({ route, navigation }) {
     try {
       // Use the first shift of the day for analysis
       const shiftId = day.shifts[0].id;
-      const analysis = await api.analyzeShiftNotes(shiftId);
+      const analysis = await gemini.analyzeShiftNotes(shiftId);
       setAiAnalysisData(analysis);
     } catch (error) {
       console.error('Error analyzing shift:', error);

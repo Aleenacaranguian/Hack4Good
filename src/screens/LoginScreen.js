@@ -198,6 +198,6 @@ const styles = StyleSheet.create({
   },
   brandingBold: {
     fontWeight: '600',
-    color: Colors.gray700,
+    color: Colors.primary,
   },
 });
