@@ -40,10 +40,12 @@ export default function RecordingDetail({ route }) {
   const fetchNotes = async () => {
     try {
       setLoading(true);
-      const fetchedNotes = await api.getNotes(recording.id);
+      // Use uuid for Supabase queries
+      const recordingId = recording.uuid || recording.id;
+      const fetchedNotes = await api.getNotes(recordingId);
       setNotes(fetchedNotes);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load notes. Please check if the backend server is running.');
+      Alert.alert('Error', 'Failed to load notes. Please check your connection.');
       console.error('Error fetching notes:', error);
     } finally {
       setLoading(false);
@@ -86,6 +88,14 @@ export default function RecordingDetail({ route }) {
         // Load and play the audio for the first time
         console.log('Loading audio from:', recording.audio_url);
 
+        // Configure audio mode for playback on iOS (use main speaker, not earpiece)
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+          staysActiveInBackground: false,
+          shouldDuckAndroid: true,
+        });
+
         const { sound: newSound } = await Audio.Sound.createAsync(
           { uri: recording.audio_url },
           { shouldPlay: true }
@@ -122,12 +132,14 @@ export default function RecordingDetail({ route }) {
         content: newNote.trim(),
       };
 
-      const createdNote = await api.addNote(recording.id, noteData);
+      // Use uuid for Supabase
+      const recordingId = recording.uuid || recording.id;
+      const createdNote = await api.addNote(recordingId, noteData);
       setNotes([...notes, createdNote]);
       setNewNote('');
-      Alert.alert('Success', 'Note added successfully and synced with server');
+      Alert.alert('Success', 'Note added successfully');
     } catch (error) {
-      Alert.alert('Error', 'Failed to add note. Please check if the backend server is running.');
+      Alert.alert('Error', 'Failed to add note. Please check your connection.');
       console.error('Error adding note:', error);
     } finally {
       setSubmitting(false);
@@ -208,13 +220,13 @@ export default function RecordingDetail({ route }) {
           ) : notes.length > 0 ? (
             <View style={styles.notesList}>
               {notes.map((note) => (
-                <View key={note.id} style={styles.noteCard}>
+                <View key={note.uuid || note.id} style={styles.noteCard}>
                   <View style={styles.noteHeader}>
                     <Text style={styles.noteCaregiverName}>
-                      {note.caregiverName || note.caregiver_name}
+                      {note.caregiver_name || note.caregiverName}
                     </Text>
                     <Text style={styles.noteTimestamp}>
-                      {formatTime(note.timestamp)}
+                      {formatTime(note.created_at || note.timestamp)}
                     </Text>
                   </View>
                   <Text style={styles.noteContent}>{note.content}</Text>
